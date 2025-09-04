@@ -559,18 +559,16 @@ class Potential:
     def select_recent_30_tuple(self) -> None:
         '''获取用户recent30数据'''
         self.c.execute(
-            '''select r_index, song_id, difficulty, rating from recent30 where user_id = ? order by time_played DESC''', (self.user.user_id,))
+            '''select r_index, song_id, difficulty, rating from recent30 where user_id = ? and song_id != '' order by time_played DESC''', (self.user.user_id,))
 
-        self.r30_tuples = [x for x in self.c.fetchall() if x[1] != '']
+        self.r30_tuples = self.c.fetchall()
 
     def select_recent_30(self) -> None:
         self.c.execute(
-            '''select song_id, difficulty, score, shiny_perfect_count, perfect_count, near_count, miss_count, health, modifier, time_played, clear_type, rating from recent30 where user_id = ? order by time_played DESC''', (self.user.user_id,))
+            '''select song_id, difficulty, score, shiny_perfect_count, perfect_count, near_count, miss_count, health, modifier, time_played, clear_type, rating from recent30 where user_id = ? and song_id != '' order by time_played DESC''', (self.user.user_id,))
 
         self.r30 = []
         for x in self.c.fetchall():
-            if x[0] == '':
-                continue
             s = Score()
             s.song.set_chart(x[0], x[1])
             s.set_score(*x[2:-1])
