@@ -5,8 +5,9 @@ from flask import Blueprint, jsonify, request
 from werkzeug.datastructures import ImmutableMultiDict
 
 from core.bundle import BundleDownload
+from core.character import UserCharacter
 from core.download import DownloadList
-from core.error import RateLimit, ArcError
+from core.error import ArcError, RateLimit
 from core.item import ItemCharacter
 from core.notification import NotificationFactory
 from core.sql import Connect
@@ -120,6 +121,21 @@ def insight_complete(user_id, pack_id):
 
         return success_return({
             'insight_state': u.insight_state
+        })
+
+
+@bp.route('/unlock/me/awaken_maya', methods=['POST'])
+@auth_required(request)
+@arc_try
+def awaken_maya(user_id):
+    with Connect() as c:
+        ch = UserCharacter(c, 71, UserOnline(c, user_id))
+        ch.select_character_info()
+        ch.character_uncap()
+
+        return success_return({
+            'user_id': user_id,
+            'updated_characters': [ch.to_dict()]
         })
 
 
