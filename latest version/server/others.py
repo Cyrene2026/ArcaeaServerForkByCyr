@@ -131,7 +131,11 @@ def awaken_maya(user_id):
     with Connect() as c:
         ch = UserCharacter(c, 71, UserOnline(c, user_id))
         ch.select_character_info()
-        ch.character_uncap()
+        try:
+            ch.character_uncap()
+            # ensure no error raised
+        except ArcError:
+            pass
 
         return success_return({
             'user_id': user_id,
