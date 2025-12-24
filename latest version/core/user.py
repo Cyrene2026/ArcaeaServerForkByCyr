@@ -566,6 +566,8 @@ class UserInfo(User):
             #         "feature": "paymentlink"
             #     }
             # ],
+
+            # has_email: True
         }
 
     def from_list(self, x: list) -> 'UserInfo':
