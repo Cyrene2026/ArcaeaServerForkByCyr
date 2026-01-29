@@ -1,6 +1,5 @@
 # encoding: utf-8
 
-import json
 import os
 from importlib import import_module
 
@@ -9,13 +8,7 @@ from core.config_manager import Config, ConfigManager
 if os.path.exists('config.py') or os.path.exists('config'):
     # 导入用户自定义配置
     ConfigManager.load(import_module("config").Config)
-else:
-    # Allow importing the config from a custom path given through an environment variable
-    configPath = os.environ.get("ARCAEA_JSON_CONFIG_PATH")
-    if configPath and os.path.exists(configPath):
-        with open(configPath, 'r') as file:
-            ConfigManager.load_dict(json.load(file))
-
+    # TODO: More config file formats
 
 if Config.DEPLOY_MODE == 'gevent':
     # 异步

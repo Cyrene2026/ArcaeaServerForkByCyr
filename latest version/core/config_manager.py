@@ -12,7 +12,7 @@ class Config:
 
     SONG_FILE_HASH_PRE_CALCULATE = True
 
-    GAME_API_PREFIX = ['/autumntrain/37', '/']  # str | list[str]
+    GAME_API_PREFIX = ['/apricotduck/38', '/']  # str | list[str]
     OLD_GAME_API_PREFIX = []  # str | list[str]
 
     ALLOW_APPVERSION = []  # list[str]
@@ -100,6 +100,7 @@ class Config:
     DATABASE_INIT_PATH = './database/init/'
     SQLITE_LOG_DATABASE_PATH = './database/arcaea_log.db'
     SQLITE_DATABASE_DELETED_PATH = './database/arcaea_database_deleted.db'
+    LOG_FOLDER_PATH = './log/'
 
     GAME_LOGIN_RATE_LIMIT = '30/5 minutes'
     API_LOGIN_RATE_LIMIT = '10/5 minutes'
