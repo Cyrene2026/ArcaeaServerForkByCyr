@@ -327,8 +327,7 @@ class FileChecker:
     def check_song_file(self) -> bool:
         '''检查song有关文件并初始化缓存'''
         f = self.check_folder(Config.SONG_FILE_FOLDER_PATH)
-        song_cache_path = os.path.join(os.path.dirname(Config.SQLITE_DATABASE_PATH) or '.', 'song_cache.db')
-        self.logger.info("Initialize song data..." if not os.path.isfile(song_cache_path) else "Reusing song data cache...")
+        self.logger.info("Initialize song data...")
         try:
             DownloadList.initialize_cache()
             if not Config.SONG_FILE_HASH_PRE_CALCULATE:
