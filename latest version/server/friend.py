@@ -14,7 +14,10 @@ bp = Blueprint('friend', __name__, url_prefix='/friend')
 @arc_try
 def friend_get(user_id):
     with Connect() as c:
-        return success_return(UserOnline(c, user_id).friends)
+        user = UserOnline(c, user_id)
+        return success_return({
+            "friends": user.friends
+        })
 
 
 @bp.route('/me/add', methods=['POST'])  # 加好友
