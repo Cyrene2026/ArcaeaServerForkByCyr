@@ -59,7 +59,7 @@ class ContentBundle:
         }
         if self.json_url and self.bundle_url:
             r['jsonUrl'] = self.json_url
-            r['bundleUrl'] = self.bundle_url
+            r['bundleParts'][0]['bundleUrl'] = self.bundle_url
         return r
 
     def calculate_size(self) -> None:
