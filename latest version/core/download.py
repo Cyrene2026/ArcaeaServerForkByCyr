@@ -13,7 +13,7 @@ from .user import User
 from .util import get_file_md5, md5
 
 
-@lru_cache(maxsize=8192)
+@lru_cache(maxsize=Constant.LRU_CACHE_MAX_SIZE['get_song_file_md5'])
 def get_song_file_md5(song_id: str, file_name: str) -> str:
     path = os.path.join(Constant.SONG_FILE_FOLDER_PATH, song_id, file_name)
     if not os.path.isfile(path):
@@ -22,7 +22,7 @@ def get_song_file_md5(song_id: str, file_name: str) -> str:
 
 
 class SonglistParser:
-    '''songlist文件解析器'''
+    '''songlist 文件解析器'''
 
     FILE_NAMES = ['0.aff', '1.aff', '2.aff', '3.aff', '4.aff',
                   'base.ogg', '3.ogg', 'video.mp4', 'video_audio.ogg', 'video_720.mp4', 'video_1080.mp4']
@@ -85,7 +85,7 @@ class SonglistParser:
                 if i['ratingClass'] == 3 and i.get('audioOverride', False):
                     r |= 64
                 r |= 1 << i['ratingClass']
-        else: # 針對remote_dl為False時BYD難度強制下載的處理
+        else:  # 針對remote_dl為False時BYD難度強制下載的處理
             for i in song.get('difficulties', []):
                 if i['ratingClass'] == 3:
                     r |= 8
@@ -264,7 +264,7 @@ class DownloadList(UserDownload):
             self.user.user_id, x.song_id, x.file_name, x.token, x.token_time) for x in self.downloads])
 
     @staticmethod
-    @lru_cache(maxsize=2048)
+    @lru_cache(maxsize=Constant.LRU_CACHE_MAX_SIZE['get_one_song_file_names'])
     def get_one_song_file_names(song_id: str) -> list:
         '''获取一个歌曲文件夹下的所有合法文件名，有lru缓存'''
         r = []

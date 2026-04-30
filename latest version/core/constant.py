@@ -1,7 +1,7 @@
 from .config_manager import Config
 
-ARCAEA_SERVER_VERSION = 'v2.12.1.10'
-ARCAEA_DATABASE_VERSION = 'v2.12.1.10'
+ARCAEA_SERVER_VERSION = 'v2.12.1.11'
+ARCAEA_DATABASE_VERSION = 'v2.12.1.11'
 ARCAEA_LOG_DATBASE_VERSION = 'v1.1'
 
 
@@ -48,7 +48,7 @@ class Constant:
     INVASION_START_WEIGHT = Config.INVASION_START_WEIGHT
     INVASION_HARD_WEIGHT = Config.INVASION_HARD_WEIGHT
     ENABLE_WORLD_RANK = Config.ENABLE_WORLD_RANK
-    
+
     WORLD_MAP_FOLDER_PATH = Config.WORLD_MAP_FOLDER_PATH
     SONG_FILE_FOLDER_PATH = Config.SONG_FILE_FOLDER_PATH
     SONGLIST_FILE_PATH = Config.SONGLIST_FILE_PATH
@@ -63,6 +63,13 @@ class Constant:
     BUNDLE_DOWNLOAD_TIMES_LIMIT = Config.BUNDLE_DOWNLOAD_TIMES_LIMIT
     BUNDLE_DOWNLOAD_TIME_GAP_LIMIT = Config.BUNDLE_DOWNLOAD_TIME_GAP_LIMIT
     BUNDLE_DOWNLOAD_LINK_PREFIX = Config.BUNDLE_DOWNLOAD_LINK_PREFIX
+
+    LRU_CACHE_MAX_SIZE = {
+        'get_bundles': 256,
+        'get_song_file_md5': 16384,
+        'get_one_song_file_names': 4096,
+        'get_world_info': 1024,
+    }
 
     LINKPLAY_UNLOCK_LENGTH = 1024  # Units: bytes
     LINKPLAY_TIMEOUT = 5  # Units: seconds
@@ -128,7 +135,7 @@ class Constant:
     ]
 
     DATABASE_MIGRATE_TABLES = ['user', 'friend', 'best_score', 'recent30', 'user_world', 'item', 'user_item', 'purchase', 'purchase_item', 'user_save', 'user_mission',
-                               'login', 'present', 'user_present', 'present_item', 'redeem', 'user_redeem', 'redeem_item', 'api_login', 'chart', 'user_course', 'user_char', 'user_role']
+                               'login', 'present', 'user_present', 'present_item', 'redeem', 'user_redeem', 'redeem_item', 'api_login', 'chart', 'user_course', 'user_char', 'user_role', 'user_kvdata']
 
     LOG_DATABASE_MIGRATE_TABLES = ['cache', 'user_score', 'user_rating']
 

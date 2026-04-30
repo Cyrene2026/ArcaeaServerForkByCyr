@@ -55,7 +55,7 @@ class ContentBundle:
             'contentBundleVersion': self.version,
             'appVersion': self.app_version,
             'jsonSize': self.json_size,
-            'bundleParts': [ { 'bundleSize': self.bundle_size } ]
+            'bundleParts': [{'bundleSize': self.bundle_size}]
         }
         if self.json_url and self.bundle_url:
             r['jsonUrl'] = self.json_url
@@ -132,7 +132,7 @@ class BundleParser:
             self.max_bundle_version[k] = v[-1].version
 
     @staticmethod
-    @lru_cache(maxsize=128)
+    @lru_cache(maxsize=Constant.LRU_CACHE_MAX_SIZE['get_bundles'])
     def get_bundles(app_ver: str, b_ver: str) -> 'list[ContentBundle]':
         if Config.BUNDLE_STRICT_MODE:
             return BundleParser.bundles.get(app_ver, [])
