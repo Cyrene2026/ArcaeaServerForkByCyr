@@ -34,7 +34,7 @@ class Constant:
     LUNA_UNCAP_BONUS_PROGRESS = 7
     AYU_UNCAP_BONUS_PROGRESS = 5
     SKILL_FATALIS_WORLD_LOCKED_TIME = 3600000
-    SKILL_MIKA_SONGS = ['aprilshowers', 'seventhsense', 'oshamascramble',
+    SKILL_MIKA_SONGS = ['aprilshowers', 'seventhsense', 'oshamascramble', 'breakbreak', 'straightintolights', 'virtus', 'yomibitoshirazu',
                         'amazingmightyyyy', 'cycles', 'maxrage', 'infinity', 'temptation']
     FATALIS_MAX_VALUE = 100
 
@@ -47,7 +47,8 @@ class Constant:
     RECENT10_WEIGHT = Config.RECENT10_WEIGHT
     INVASION_START_WEIGHT = Config.INVASION_START_WEIGHT
     INVASION_HARD_WEIGHT = Config.INVASION_HARD_WEIGHT
-
+    ENABLE_WORLD_RANK = Config.ENABLE_WORLD_RANK
+    
     WORLD_MAP_FOLDER_PATH = Config.WORLD_MAP_FOLDER_PATH
     SONG_FILE_FOLDER_PATH = Config.SONG_FILE_FOLDER_PATH
     SONGLIST_FILE_PATH = Config.SONGLIST_FILE_PATH
@@ -126,7 +127,7 @@ class Constant:
                                                      0x6CB300), (0XA35687B, 0xE456CDEA)
     ]
 
-    DATABASE_MIGRATE_TABLES = ['user', 'friend', 'best_score', 'recent30', 'user_world', 'item', 'user_item', 'purchase', 'purchase_item', 'user_save',
+    DATABASE_MIGRATE_TABLES = ['user', 'friend', 'best_score', 'recent30', 'user_world', 'item', 'user_item', 'purchase', 'purchase_item', 'user_save', 'user_mission',
                                'login', 'present', 'user_present', 'present_item', 'redeem', 'user_redeem', 'redeem_item', 'api_login', 'chart', 'user_course', 'user_char', 'user_role']
 
     LOG_DATABASE_MIGRATE_TABLES = ['cache', 'user_score', 'user_rating']

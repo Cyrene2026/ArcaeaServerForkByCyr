@@ -33,6 +33,7 @@ class Config:
 
     IS_APRILFOOLS = True
 
+    ENABLE_WORLD_RANK = True
     WORLD_RANK_MAX = 200
 
     AVAILABLE_MAP = []  # list[str]
