@@ -1,28 +1,34 @@
 from base64 import b64decode
+import logging
 
-from flask import Blueprint, current_app, request
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, ConfigDict
 
 from core.api_user import APIUser
 from core.error import PostError
 from core.sql import Connect
 
-from .api_auth import api_try, request_json_handle, role_required
-from .api_code import success_return
+from .native import api_success, require_api_user
 
-bp = Blueprint('token', __name__, url_prefix='/token')
+router = APIRouter(prefix='/token', tags=['token'])
+logger = logging.getLogger('main')
 
 
-@bp.route('', methods=['POST'])
-@request_json_handle(request, required_keys=['auth'])
-@api_try
-def token_post(data):
+class TokenLoginPayload(BaseModel):
+    auth: str
+
+    model_config = ConfigDict(extra='ignore')
+
+
+@router.post('')
+def token_post(payload: TokenLoginPayload, request: Request):
     '''
         登录，获取token
 
         {'auth': base64('<user_id>:<password>')}
     '''
     try:
-        auth_decode = bytes.decode(b64decode(data['auth']))
+        auth_decode = bytes.decode(b64decode(payload.auth))
     except Exception as e:
         raise PostError(api_error_code=-100) from e
     if ':' not in auth_decode:
@@ -31,25 +37,22 @@ def token_post(data):
 
     with Connect() as c:
         user = APIUser(c)
-        user.login(name, password, request.remote_addr)
-        current_app.logger.info(f'API user `{user.user_id}` log in')
-        return success_return({'token': user.api_token, 'user_id': user.user_id})
+        ip = request.client.host if request.client else None
+        user.login(name, password, ip)
+        logger.info(f'API user `{user.user_id}` log in')
+        return api_success({'token': user.api_token, 'user_id': user.user_id})
 
 
-@bp.route('', methods=['GET'])
-@role_required(request, ['select_me', 'select'])
-@api_try
-def token_get(user):
+@router.get('')
+def token_get(user: APIUser = Depends(require_api_user(['select_me', 'select']))):
     '''判断登录有效性'''
-    return success_return()
+    return api_success()
 
 
-@bp.route('', methods=['DELETE'])
-@role_required(request, ['change_me', 'select_me', 'select'])
-@api_try
-def token_delete(user):
+@router.delete('')
+def token_delete(user: APIUser = Depends(require_api_user(['change_me', 'select_me', 'select']))):
     '''登出'''
     with Connect() as c:
         user.c = c
         user.logout()
-        return success_return()
+        return api_success()

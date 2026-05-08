@@ -247,10 +247,18 @@ class UserPlay(UserScore):
         self.combo_interval_bonus: int = None  # 不能给 None 以外的默认值
         self.hp_interval_bonus: int = None  # 不能给 None 以外的默认值
         self.fever_bonus: int = None  # 不能给 None 以外的默认值
+        self.rank_bonus: int = None  # 不能给 None 以外的默认值
+        self.maya_gauge: int = None  # 不能给 None 以外的默认值
+        self.nextstage_bonus: int = None  # 不能给 None 以外的默认值
         self.skill_cytusii_flag: str = None
         self.skill_chinatsu_flag: str = None
         self.highest_health: int = None
         self.lowest_health: int = None
+
+        # room score
+        self.room_code: str = None
+        self.room_total_score: int = None
+        self.room_total_players: int = None
 
         self.invasion_flag: int = None  # 1: invasion_start, 2: invasion_hard
 
@@ -299,6 +307,9 @@ class UserPlay(UserScore):
 
         if self.fever_bonus is not None and (self.fever_bonus < 0 or self.fever_bonus > self.perfect_count * 5):
             # fever 等级最高为 5
+            return False
+
+        if self.rank_bonus is not None and (self.rank_bonus < 0 or self.rank_bonus > 4):
             return False
 
         y = f'{self.user.user_id}{self.song_hash}'
@@ -555,18 +566,16 @@ class Potential:
     def select_recent_30_tuple(self) -> None:
         '''获取用户recent30数据'''
         self.c.execute(
-            '''select r_index, song_id, difficulty, rating from recent30 where user_id = ? order by time_played DESC''', (self.user.user_id,))
+            '''select r_index, song_id, difficulty, rating from recent30 where user_id = ? and song_id != '' order by time_played DESC''', (self.user.user_id,))
 
-        self.r30_tuples = [x for x in self.c.fetchall() if x[1] != '']
+        self.r30_tuples = self.c.fetchall()
 
     def select_recent_30(self) -> None:
         self.c.execute(
-            '''select song_id, difficulty, score, shiny_perfect_count, perfect_count, near_count, miss_count, health, modifier, time_played, clear_type, rating from recent30 where user_id = ? order by time_played DESC''', (self.user.user_id,))
+            '''select song_id, difficulty, score, shiny_perfect_count, perfect_count, near_count, miss_count, health, modifier, time_played, clear_type, rating from recent30 where user_id = ? and song_id != '' order by time_played DESC''', (self.user.user_id,))
 
         self.r30 = []
         for x in self.c.fetchall():
-            if x[0] == '':
-                continue
             s = Score()
             s.song.set_chart(x[0], x[1])
             s.set_score(*x[2:-1])

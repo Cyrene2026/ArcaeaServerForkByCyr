@@ -1,19 +1,27 @@
-from flask import Flask, jsonify
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-app = Flask(__name__)
+app = FastAPI()
+
+
+class MaintenanceResponse(BaseModel):
+    success: bool = False
+    error_code: int = 2
 
 HOST = '0.0.0.0'
-PORT = '80'
+PORT = 80
 
-@app.route('/favicon.ico', methods=['GET'])
+
+@app.get('/favicon.ico')
 def favicon():
     return ''
 
-@app.route('/<path:p>')
+
+@app.get('/{p:path}', response_model=MaintenanceResponse)
 def hello(p):
-    r = {"success": False, "error_code": 2}
-    return jsonify(r)
+    return MaintenanceResponse()
 
 
 if __name__ == '__main__':
-    app.run(host=HOST, port=PORT)
+    uvicorn.run(app, host=HOST, port=PORT)

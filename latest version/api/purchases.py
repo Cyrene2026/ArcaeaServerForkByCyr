@@ -1,130 +1,155 @@
-from flask import Blueprint, request
+from typing import Any
 
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, ConfigDict
+
+from core.api_user import APIUser
 from core.error import DataExist, InputError, NoData
 from core.item import ItemFactory
 from core.purchase import Purchase
 from core.sql import Connect, Query, Sql
 
-from .api_auth import api_try, request_json_handle, role_required
-from .api_code import success_return
-from .constant import Constant
+from .native import BatchPatchPayload, QueryPayload, api_success, require_api_user
 
-bp = Blueprint('purchases', __name__, url_prefix='/purchases')
+router = APIRouter(prefix='/purchases', tags=['purchases'])
 
 
-@bp.route('', methods=['GET'])
-@role_required(request, ['select'])
-@request_json_handle(request, optional_keys=Constant.QUERY_KEYS)
-@api_try
-def purchases_get(data, user):
-    '''查询全购买信息'''
+class PurchaseCreatePayload(BaseModel):
+    purchase_name: Any
+    orig_price: Any
+    price: Any = None
+    discount_from: Any = None
+    discount_to: Any = None
+    discount_reason: Any = None
+    items: Any = None
+
+    model_config = ConfigDict(extra='ignore')
+
+
+class PurchaseUpdatePayload(BaseModel):
+    price: Any = None
+    orig_price: Any = None
+    discount_from: Any = None
+    discount_to: Any = None
+    discount_reason: Any = None
+
+    model_config = ConfigDict(extra='ignore')
+
+    def to_data(self) -> dict:
+        return {key: getattr(self, key) for key in self.model_fields_set}
+
+
+@router.get('')
+def purchases_get(
+    data: QueryPayload = Depends(),
+    user: APIUser = Depends(require_api_user(['select'])),
+):
+    '''查询全部购买信息'''
     with Connect() as c:
         query = Query(['purchase_name', 'discount_reason'], ['purchase_name'], [
-                      'purchase_name', 'price', 'orig_price', 'discount_from', 'discount_to']).from_dict(data)
+                      'purchase_name', 'price', 'orig_price', 'discount_from', 'discount_to']).from_dict(data.to_data())
         x = Sql(c).select('purchase', query=query)
         r = [Purchase().from_list(i) for i in x]
 
         if not r:
             raise NoData(api_error_code=-2)
 
-        return success_return([x.to_dict(has_items=False, show_real_price=False) for x in r])
+        return api_success([x.to_dict(has_items=False, show_real_price=False) for x in r])
 
 
-@bp.route('', methods=['POST'])
-@role_required(request, ['change'])
-@request_json_handle(request, required_keys=['purchase_name', 'orig_price'], optional_keys=['price', 'discount_from', 'discount_to', 'discount_reason', 'items'])
-@api_try
-def purchases_post(data, user):
+@router.post('')
+def purchases_post(
+    data: PurchaseCreatePayload,
+    user: APIUser = Depends(require_api_user(['change'])),
+):
     '''新增购买，注意可以有items，不存在的item会自动创建'''
+    payload = data.model_dump(exclude_none=True)
     with Connect() as c:
-        purchase = Purchase(c).from_dict(data)
+        purchase = Purchase(c).from_dict(payload)
         if purchase.select_exists():
             raise DataExist(
                 f'Purchase `{purchase.purchase_name}` already exists')
         purchase.insert_all()
-        return success_return(purchase.to_dict(has_items='items' in data, show_real_price=False))
+        return api_success(purchase.to_dict(has_items='items' in payload, show_real_price=False))
 
 
-@bp.route('/<string:purchase_name>', methods=['GET'])
-@role_required(request, ['select'])
-@api_try
-def purchases_purchase_get(user, purchase_name: str):
+@router.get('/{purchase_name}')
+def purchases_purchase_get(
+    purchase_name: str,
+    user: APIUser = Depends(require_api_user(['select'])),
+):
     '''查询单个购买信息'''
     with Connect() as c:
-        return success_return(Purchase(c).select(purchase_name).to_dict(show_real_price=False))
+        return api_success(Purchase(c).select(purchase_name).to_dict(show_real_price=False))
 
 
-@bp.route('/<string:purchase_name>', methods=['DELETE'])
-@role_required(request, ['change'])
-@api_try
-def purchases_purchase_delete(user, purchase_name: str):
+@router.delete('/{purchase_name}')
+def purchases_purchase_delete(
+    purchase_name: str,
+    user: APIUser = Depends(require_api_user(['change'])),
+):
     '''删除单个购买信息，会连带删除purchase_item'''
     with Connect() as c:
         Purchase(c).select(purchase_name).delete_all()
-        return success_return()
+        return api_success()
 
 
-@bp.route('/<string:purchase_name>', methods=['PUT'])
-@role_required(request, ['change'])
-@request_json_handle(request, optional_keys=['price', 'orig_price', 'discount_from', 'discount_to', 'discount_reason'], must_change=True)
-@api_try
-def purchases_purchase_put(data, user, purchase_name: str):
+@router.put('/{purchase_name}')
+def purchases_purchase_put(
+    purchase_name: str,
+    data: PurchaseUpdatePayload,
+    user: APIUser = Depends(require_api_user(['change'])),
+):
     '''修改单个购买信息，注意不能有items'''
+    payload = data.to_data()
+    if not payload:
+        raise InputError('No change', api_error_code=-100)
     with Connect() as c:
         purchase = Purchase(c).select(purchase_name)
         t = ['price', 'orig_price', 'discount_from', 'discount_to']
         for i in t:
-            if i in data:
-                setattr(purchase, i, int(data[i]))
-        if 'discount_reason' in data:
-            purchase.discount_reason = str(data['discount_reason'])
+            if i in payload:
+                setattr(purchase, i, int(payload[i]))
+        if 'discount_reason' in payload:
+            purchase.discount_reason = str(payload['discount_reason'])
 
         purchase.update()
-        return success_return(purchase.to_dict(has_items=False, show_real_price=False))
+        return api_success(purchase.to_dict(has_items=False, show_real_price=False))
 
 
-@bp.route('/<string:purchase_name>/items', methods=['GET'])
-@role_required(request, ['select'])
-@api_try
-def purchases_purchase_items_get(user, purchase_name: str):
+@router.get('/{purchase_name}/items')
+def purchases_purchase_items_get(
+    purchase_name: str,
+    user: APIUser = Depends(require_api_user(['select'])),
+):
     '''查询单个购买的所有items'''
     with Connect() as c:
         p = Purchase(c)
         p.purchase_name = purchase_name
         p.select_items()
-        return success_return([x.to_dict(has_is_available=True) for x in p.items])
+        return api_success([x.to_dict(has_is_available=True) for x in p.items])
 
 
-# @bp.route('/<string:purchase_name>/items', methods=['POST'])
-# @role_required(request, ['change'])
-# @request_json_handle(request, required_keys=['item_id', 'type'], optional_keys=['amount'])
-# @api_try
-# def purchases_purchase_items_post(data, user, purchase_name: str):
-#     '''新增单个购买的批量items'''
-#     with Connect() as c:
-#         p = Purchase(c)
-#         p.purchase_name = purchase_name
-#         p.select_items()
-#         p.add_items([ItemFactory().from_dict(data)])
-#         return success_return([x.to_dict(has_is_available=True) for x in p.items])
-
-
-@bp.route('/<string:purchase_name>/items', methods=['PATCH'])
-@role_required(request, ['change'])
-@request_json_handle(request, is_batch=True)
-@api_try
-def purchases_purchase_items_patch(data, user, purchase_name: str):
+@router.patch('/{purchase_name}/items')
+def purchases_purchase_items_patch(
+    purchase_name: str,
+    data: BatchPatchPayload,
+    user: APIUser = Depends(require_api_user(['change'])),
+):
     '''增删改单个购买的批量items'''
+    payload = data.to_data()
+    if not payload:
+        raise InputError('No change', api_error_code=-100)
     with Connect() as c:
         p = Purchase(c)
         p.purchase_name = purchase_name
         p.select_items()
         p.remove_items([ItemFactory.from_dict(x, c=c)
-                        for x in data.get('remove', [])])
+                        for x in payload.get('remove', [])])
         p.add_items([ItemFactory.from_dict(x, c=c)
-                     for x in data.get('create', [])])
+                     for x in payload.get('create', [])])
 
-        updates = data.get('update', [])
+        updates = payload.get('update', [])
         for x in updates:
             if 'amount' not in x:
                 raise InputError('`amount` is required in `update`')
@@ -133,31 +158,4 @@ def purchases_purchase_items_patch(data, user, purchase_name: str):
                     '`amount` must be a positive integer', api_error_code=-101)
 
         p.update_items([ItemFactory.from_dict(x, c=c) for x in updates])
-        return success_return([x.to_dict(has_is_available=True) for x in p.items])
-
-
-# @bp.route('/<string:purchase_name>/items/<string:item_type>/<string:item_id>', methods=['DELETE'])
-# @role_required(request, ['change'])
-# @api_try
-# def purchases_purchase_items_item_delete(user, purchase_name: str, item_type: str, item_id: str):
-#     '''删除单个购买的单个item'''
-#     with Connect() as c:
-#         p = Purchase(c)
-#         p.purchase_name = purchase_name
-#         p.select_items()
-#         p.delete_items([ItemFactory().from_dict(
-#             {'item_type': item_type, 'item_id': item_id})])
-#         return success_return()
-
-
-# @bp.route('/<string:purchase_name>/items/<string:item_type>/<string:item_id>', methods=['PUT'])
-# @role_required(request, ['change'])
-# @request_json_handle(request, optional_keys=['amount', 'is_available'], must_change=True)
-# @api_try
-# def purchases_purchase_items_item_put(data, user, purchase_name: str, item_type: str, item_id: str):
-#     '''修改单个购买的单个item'''
-#     with Connect() as c:
-#         p = Purchase(c)
-#         p.purchase_name = purchase_name
-#         pass
-#         return success_return()
+        return api_success([x.to_dict(has_is_available=True) for x in p.items])

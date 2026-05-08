@@ -1,14 +1,21 @@
 import functools
 import hashlib
 
+from fastapi import APIRouter
+
 from core.config_manager import Config
-from flask import (Blueprint, flash, g, redirect, render_template, request,
-                   session, url_for)
+from flask import flash, g, redirect, render_template, request, session, url_for
+from web.native import WebCompatRoute
 
-bp = Blueprint('login', __name__, url_prefix='/web')
+router = APIRouter(
+    prefix='/web',
+    tags=['web-login'],
+    route_class=WebCompatRoute,
+    include_in_schema=False,
+)
 
 
-@bp.route('/login', methods=('GET', 'POST'))
+@router.api_route('/login', methods=('GET', 'POST'))
 def login():
     # 登录
     if request.method == 'POST':
@@ -33,7 +40,7 @@ def login():
     return render_template('web/login.html')
 
 
-@bp.route('/logout')
+@router.api_route('/logout')
 def logout():
     # 登出
     session.clear()

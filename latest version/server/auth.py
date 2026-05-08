@@ -1,26 +1,27 @@
 import base64
-from functools import wraps
+import logging
 
-from flask import Blueprint, current_app, g, jsonify, request
+from fastapi import APIRouter, Request
 
-from core.error import ArcError, NoAccess
 from core.sql import Connect
-from core.user import UserAuth, UserLogin
+from core.user import UserLogin
 
-from .func import arc_try, error_return, header_check
+from .native import form_data, game_success, header_check, server_try
 
-bp = Blueprint('auth', __name__, url_prefix='/auth')
+router = APIRouter(prefix='/auth', tags=['game-auth'])
+logger = logging.getLogger('main')
 
 
-@bp.route('/login', methods=['POST'])  # 登录接口
-@arc_try
-def login():
+@router.post('/login')
+@server_try
+async def login(request: Request):
     headers = request.headers
     e = header_check(request)
     if e is not None:
         raise e
 
-    request.form['grant_type']
+    form = await form_data(request)
+    form['grant_type']
     with Connect() as c:
         id_pwd = headers['Authorization']
         id_pwd = base64.b64decode(id_pwd[6:]).decode()
@@ -31,37 +32,7 @@ def login():
             device_id = 'low_version'
 
         user = UserLogin(c)
-        user.login(name, password, device_id, request.remote_addr)
-        current_app.logger.info(f'User `{user.user_id}` log in')
-        return jsonify({"success": True, "token_type": "Bearer", 'user_id': user.user_id, 'access_token': user.token})
-
-
-def auth_required(req):
-    # arcaea登录验证，写成了修饰器
-    def decorator(view):
-        @wraps(view)
-        def wrapped_view(*args, **kwargs):
-
-            headers = req.headers
-
-            e = header_check(req)
-            if e is not None:
-                current_app.logger.warning(
-                    f' - {e.error_code}|{e.api_error_code}: {e}')
-                return error_return(e)
-
-            with Connect() as c:
-                try:
-                    user = UserAuth(c)
-                    token = headers.get('Authorization')
-                    if not token:
-                        raise NoAccess('No token.', -4)
-                    user.token = token[7:]
-                    user_id = user.token_get_id()
-                    g.user = user
-                except ArcError as e:
-                    return error_return(e)
-            return view(user_id, *args, **kwargs)
-
-        return wrapped_view
-    return decorator
+        ip = request.client.host if request.client else ''
+        user.login(name, password, device_id, ip)
+        logger.info(f'User `{user.user_id}` log in')
+        return game_success({"token_type": "Bearer", 'user_id': user.user_id, 'access_token': user.token})

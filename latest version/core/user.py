@@ -47,6 +47,8 @@ class User:
         self.world_rank_score: int = None
         self.ban_flag = None
 
+        self.is_allow_marketing_email = False
+
     @property
     def hash_pwd(self) -> str:
         '''`password`的SHA-256值'''
@@ -162,9 +164,9 @@ class UserRegister(User):
         self._insert_user_char()
 
         self.c.execute('''insert into user(user_id, name, password, join_date, user_code, rating_ptt,
-        character_id, is_skill_sealed, is_char_uncapped, is_char_uncapped_override, is_hide_rating, favorite_character, max_stamina_notification_enabled, current_map, ticket, prog_boost, email)
-        values(:user_id, :name, :password, :join_date, :user_code, 0, 0, 0, 0, 0, 0, -1, 0, '', :memories, 0, :email)
-        ''', {'user_code': self.user_code, 'user_id': self.user_id, 'join_date': now, 'name': self.name, 'password': self.hash_pwd, 'memories': Config.DEFAULT_MEMORIES, 'email': self.email})
+        character_id, is_skill_sealed, is_char_uncapped, is_char_uncapped_override, is_hide_rating, favorite_character, max_stamina_notification_enabled, current_map, ticket, prog_boost, email, is_allow_marketing_email)
+        values(:user_id, :name, :password, :join_date, :user_code, 0, 0, 0, 0, 0, 0, -1, 0, '', :memories, 0, :email, :is_allow_marketing_email)
+        ''', {'user_code': self.user_code, 'user_id': self.user_id, 'join_date': now, 'name': self.name, 'password': self.hash_pwd, 'memories': Config.DEFAULT_MEMORIES, 'email': self.email, 'is_allow_marketing_email': self.is_allow_marketing_email})
 
 
 class UserLogin(User):
@@ -328,7 +330,9 @@ class UserInfo(User):
 
         self.insight_state: int = None
 
-        self.custom_banner = None
+        self.custom_banner: str = None
+
+        self.is_profile_public: bool = None
 
         self.__cores: list = None
         self.__packs: list = None
@@ -339,6 +343,7 @@ class UserInfo(User):
         self.__world_songs: list = None
         self.curr_available_maps: list = None
         self.__course_banners: list = None
+        self.__online_banners: list = None
 
     @property
     def is_insight_enabled(self) -> bool:
@@ -405,6 +410,19 @@ class UserInfo(User):
 
         return self.__course_banners
 
+    @property
+    def online_banners(self) -> list:
+        if self.__online_banners is None:
+            x = UserItemList(
+                self.c, self).select_from_type('online_banner')
+            self.__online_banners = [i.item_id for i in x.items]
+
+        return self.__online_banners
+
+    @property
+    def banners(self) -> list:
+        return self.course_banners + self.online_banners
+
     def select_characters(self) -> None:
         self.characters = UserCharacterList(self.c, self)
         self.characters.select_user_characters()
@@ -448,7 +466,7 @@ class UserInfo(User):
 
                 rating = you.rating_ptt if not you.is_hide_rating else -1
 
-                s.append({
+                d = {
                     "is_mutual": is_mutual,
                     "is_char_uncapped_override": character.is_uncapped_override,
                     "is_char_uncapped": character.is_uncapped,
@@ -458,8 +476,19 @@ class UserInfo(User):
                     "character": character.character_id,
                     "recent_score": you.recent_score_list,
                     "name": you.name,
-                    "user_id": you.user_id
-                })
+                    "user_id": you.user_id,
+                    'is_profile_public': you.is_profile_public,
+                }
+
+                # profile
+                if you.is_profile_public:
+                    d.update({
+                        'custom_banner': you.custom_banner
+                        # 'world_unlock': "scenery_default",
+                        # 'showcase_characters': [-1, -1, -1],
+                    })
+
+                s.append(d)
             s.sort(key=lambda item: item["recent_score"][0]["time_played"] if len(
                 item["recent_score"]) > 0 else 0, reverse=True)
             self.__friends = s
@@ -520,6 +549,7 @@ class UserInfo(User):
                 "is_hide_rating": self.is_hide_rating,
                 "max_stamina_notification_enabled": self.max_stamina_notification_enabled,
                 "mp_notification_enabled": self.mp_notification_enabled,
+                "is_allow_marketing_email": self.is_allow_marketing_email,
             },
             "user_id": self.user_id,
             "name": self.name,
@@ -548,7 +578,7 @@ class UserInfo(User):
             "join_date": self.join_date,
             "global_rank": self.global_rank,
             'country': '',
-            'course_banners': self.course_banners,
+            'course_banners': self.banners,
             'world_mode_locked_end_ts': self.world_mode_locked_end_ts,
             'locked_char_ids': [],  # [1]
             'user_missions': UserMissionList(self.c, self).select_all().to_dict_list(),
@@ -562,10 +592,21 @@ class UserInfo(User):
 
             # 'enabled_features': [
             #     {
-            #         "metadata": ["USA"],
-            #         "feature": "paymentlink"
+            #         "feature": "paymentlink",
+            #         "metadata": [
+            #             "USA"
+            #         ]
+            #     },
+            #     {
+            #         "feature": "if-demo-popup",
+            #         "metadata": []
             #     }
             # ],
+
+            'has_email': self.email != '',
+
+            'is_profile_public': self.is_profile_public,
+            # "showcase_characters": [-1, -1, -1],
         }
 
     def from_list(self, x: list) -> 'UserInfo':
@@ -613,6 +654,9 @@ class UserInfo(User):
         self.insight_state = x[38]
 
         self.custom_banner = x[39] if x[39] is not None else ''
+        self.is_allow_marketing_email = x[40] == 1
+
+        self.is_profile_public = x[41] == 1
 
         return self
 
@@ -699,6 +743,19 @@ class UserInfo(User):
         self.name = x[0]
         self.rating_ptt = x[1]
         self.is_hide_rating = x[2] == 1
+
+    def select_user_about_profile(self) -> None:
+        '''
+            查询 user 表有关 profile 的信息
+        '''
+        self.c.execute(
+            '''select custom_banner, is_profile_public from user where user_id=?''', (self.user_id,))
+        x = self.c.fetchone()
+        if not x:
+            raise NoData('No user.', 108, -3)
+
+        self.custom_banner = x[0] if x[0] is not None else ''
+        self.is_profile_public = x[1] == 1
 
     @property
     def global_rank(self) -> int:
@@ -859,6 +916,17 @@ class UserOnline(UserInfo):
 
         self.c.execute(
             '''update user set insight_state = ? where user_id = ?''', (self.insight_state, self.user_id))
+
+    def change_profile(self, is_public: bool = None, custom_banner: str = None) -> None:
+        # 用户资料卡设置
+        if is_public is not None:
+            self.is_profile_public = is_public
+            self.update_user_one_column('is_profile_public')
+        if custom_banner is not None:
+            if custom_banner not in ['', 'hidden'] and custom_banner not in self.banners:
+                raise InputError('Invalid banner.')
+            self.custom_banner = custom_banner
+            self.update_user_one_column('custom_banner')
 
 
 class UserChanger(UserInfo, UserRegister):

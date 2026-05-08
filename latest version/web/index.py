@@ -1,7 +1,8 @@
 import os
 import time
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from fastapi import APIRouter
+from flask import flash, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
 import web.system
@@ -9,17 +10,23 @@ import web.webscore
 from core.init import FileChecker
 from core.operation import (DeleteUserScore, RefreshAllScoreRating,
                             RefreshBundleCache, RefreshSongFileCache,
-                            SaveUpdateScore, UnlockUserItem)
+                            SaveUpdateScore, UnlockUserItem, RefreshWorldMapCache)
 from core.rank import RankList
 from core.score import Potential
 from core.sql import Connect
 from core.user import User
 from web.login import login_required
+from web.native import WebCompatRoute
 
 UPLOAD_FOLDER = 'database'
 ALLOWED_EXTENSIONS = {'db'}
 
-bp = Blueprint('index', __name__, url_prefix='/web')
+router = APIRouter(
+    prefix='/web',
+    tags=['web-index'],
+    route_class=WebCompatRoute,
+    include_in_schema=False,
+)
 
 
 def is_number(s):
@@ -31,15 +38,15 @@ def is_number(s):
     return False
 
 
-@bp.route('/index')
-@bp.route('/')
+@router.api_route('/index')
+@router.api_route('/')
 @login_required
 def index():
     # 主页
     return render_template('web/index.html')
 
 
-@bp.route('/singleplayer', methods=['POST', 'GET'])
+@router.api_route('/singleplayer', methods=['POST', 'GET'])
 @login_required
 def single_player_score():
     # 单个玩家分数查询
@@ -77,7 +84,7 @@ def single_player_score():
     return render_template('web/singleplayer.html')
 
 
-@bp.route('/singleplayerptt', methods=['POST', 'GET'])
+@router.api_route('/singleplayerptt', methods=['POST', 'GET'])
 @login_required
 def single_player_ptt():
     # 单个玩家PTT详情查询
@@ -127,7 +134,7 @@ def single_player_ptt():
     return render_template('web/singleplayerptt.html')
 
 
-@bp.route('/allplayer', methods=['GET'])
+@router.api_route('/allplayer', methods=['GET'])
 @login_required
 def all_player():
     # 所有玩家数据，按照ptt排序
@@ -179,7 +186,7 @@ def all_player():
         return render_template('web/allplayer.html', posts=posts)
 
 
-@bp.route('/allsong', methods=['GET'])
+@router.api_route('/allsong', methods=['GET'])
 @login_required
 def all_song():
     # 所有歌曲数据
@@ -216,7 +223,7 @@ def all_song():
         return render_template('web/allsong.html', posts=posts)
 
 
-@bp.route('/singlecharttop', methods=['GET', 'POST'])
+@router.api_route('/singlecharttop', methods=['GET', 'POST'])
 @login_required
 def single_chart_top():
     # 歌曲排行榜
@@ -260,7 +267,7 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@bp.route('/updatedatabase', methods=['GET', 'POST'])
+@router.api_route('/updatedatabase', methods=['GET', 'POST'])
 @login_required
 def update_database():
     # 更新数据库
@@ -293,7 +300,7 @@ def update_database():
     return render_template('web/updatedatabase.html')
 
 
-@bp.route('/updatedatabase/refreshsonghash', methods=['POST'])
+@router.api_route('/updatedatabase/refreshsonghash', methods=['POST'])
 @login_required
 def update_song_hash():
     # 更新数据库内谱面文件hash值
@@ -305,7 +312,7 @@ def update_song_hash():
     return render_template('web/updatedatabase.html')
 
 
-@bp.route('/updatedatabase/refreshsbundle', methods=['POST'])
+@router.api_route('/updatedatabase/refreshsbundle', methods=['POST'])
 @login_required
 def update_content_bundle():
     # 更新 bundle
@@ -317,7 +324,19 @@ def update_content_bundle():
     return render_template('web/updatedatabase.html')
 
 
-@bp.route('/updatedatabase/refreshsongrating', methods=['POST'])
+@router.api_route('/updatedatabase/refreshworldmap', methods=['POST'])
+@login_required
+def update_world_map():
+    # 更新 world map
+    try:
+        RefreshWorldMapCache().run()
+        flash('数据刷新成功 Success refresh data.')
+    except:
+        flash('Something error!')
+    return render_template('web/updatedatabase.html')
+
+
+@router.api_route('/updatedatabase/refreshsongrating', methods=['POST'])
 @login_required
 def update_song_rating():
     # 更新所有分数的rating
@@ -326,14 +345,14 @@ def update_song_rating():
     return render_template('web/updatedatabase.html')
 
 
-@bp.route('/changesong', methods=['GET'])
+@router.api_route('/changesong', methods=['GET'])
 @login_required
 def change_song():
     # 修改歌曲数据
     return render_template('web/changesong.html')
 
 
-@bp.route('/changesong/addsong', methods=['POST'])
+@router.api_route('/changesong/addsong', methods=['POST'])
 @login_required
 def add_song():
     # 添加歌曲数据
@@ -377,7 +396,7 @@ def add_song():
     return redirect(url_for('index.change_song'))
 
 
-@bp.route('/changesong/deletesong', methods=['POST'])
+@router.api_route('/changesong/deletesong', methods=['POST'])
 @login_required
 def delete_song():
     # 删除歌曲数据
@@ -399,7 +418,7 @@ def delete_song():
     return redirect(url_for('index.change_song'))
 
 
-@bp.route('/allchar', methods=['GET'])
+@router.api_route('/allchar', methods=['GET'])
 @login_required
 def all_character():
     # 所有角色数据
@@ -438,7 +457,7 @@ def all_character():
         return render_template('web/allchar.html', posts=posts)
 
 
-@bp.route('/changechar', methods=['GET'])
+@router.api_route('/changechar', methods=['GET'])
 @login_required
 def change_character():
     # 修改角色数据
@@ -447,7 +466,7 @@ def change_character():
     return render_template('web/changechar.html', skill_ids=skill_ids)
 
 
-@bp.route('/changesong/editchar', methods=['POST'])
+@router.api_route('/changesong/editchar', methods=['POST'])
 @login_required
 def edit_char():
     # 修改角色数据
@@ -506,7 +525,7 @@ def edit_char():
     return redirect(url_for('index.change_character'))
 
 
-@bp.route('/changesong/updatechar', methods=['POST'])
+@router.api_route('/changesong/updatechar', methods=['POST'])
 @login_required
 def update_character():
     # 更新角色数据
@@ -517,7 +536,7 @@ def update_character():
     return redirect(url_for('index.change_character'))
 
 
-@bp.route('/changeuser', methods=['GET'])
+@router.api_route('/changeuser', methods=['GET'])
 @login_required
 def change_user():
     # 修改用户信息
@@ -525,7 +544,7 @@ def change_user():
     return render_template('web/changeuser.html')
 
 
-@bp.route('/changeuser/edituser', methods=['POST'])
+@router.api_route('/changeuser/edituser', methods=['POST'])
 @login_required
 def edit_user():
     # 修改用户数据
@@ -598,7 +617,7 @@ def edit_user():
     return redirect(url_for('index.change_user'))
 
 
-@bp.route('/changeuserpurchase', methods=['GET'])
+@router.api_route('/changeuserpurchase', methods=['GET'])
 @login_required
 def change_user_purchase():
     # 修改用户购买
@@ -606,7 +625,7 @@ def change_user_purchase():
     return render_template('web/changeuserpurchase.html')
 
 
-@bp.route('/changeuserpurchase/edituser', methods=['POST'])
+@router.api_route('/changeuserpurchase/edituser', methods=['POST'])
 @login_required
 def edit_user_purchase():
     # 修改用户购买
@@ -674,7 +693,7 @@ def edit_user_purchase():
     return redirect(url_for('index.change_user_purchase'))
 
 
-@bp.route('/allitem', methods=['GET'])
+@router.api_route('/allitem', methods=['GET'])
 @login_required
 def all_item():
     # 所有物品数据
@@ -691,7 +710,7 @@ def all_item():
         return render_template('web/allitem.html', posts=posts)
 
 
-@bp.route('/changeitem', methods=['GET', 'POST'])
+@router.api_route('/changeitem', methods=['GET', 'POST'])
 @login_required
 def change_item():
     # 添加物品信息
@@ -731,7 +750,7 @@ def change_item():
     return render_template('web/changeitem.html')
 
 
-@bp.route('/changeitem/delete', methods=['POST'])
+@router.api_route('/changeitem/delete', methods=['POST'])
 @login_required
 def change_item_delete():
     # 删除物品信息
@@ -761,7 +780,7 @@ def change_item_delete():
     return render_template('web/changeitem.html')
 
 
-@bp.route('/allpurchase', methods=['GET'])
+@router.api_route('/allpurchase', methods=['GET'])
 @login_required
 def all_purchase():
     # 所有购买数据
@@ -778,7 +797,7 @@ def all_purchase():
         return render_template('web/allpurchase.html', posts=posts)
 
 
-@bp.route('/changepurchase', methods=['GET', 'POST'])
+@router.api_route('/changepurchase', methods=['GET', 'POST'])
 @login_required
 def change_purchase():
     # 添加购买信息
@@ -837,7 +856,7 @@ def change_purchase():
     return render_template('web/changepurchase.html')
 
 
-@bp.route('/changepurchase/delete', methods=['POST'])
+@router.api_route('/changepurchase/delete', methods=['POST'])
 @login_required
 def change_purchase_delete():
     # 删除购买信息
@@ -868,7 +887,7 @@ def change_purchase_delete():
     return render_template('web/changepurchase.html')
 
 
-@bp.route('/changepurchaseitem', methods=['GET', 'POST'])
+@router.api_route('/changepurchaseitem', methods=['GET', 'POST'])
 @login_required
 def change_purchase_item():
     # 添加购买的物品信息
@@ -911,7 +930,7 @@ def change_purchase_item():
     return render_template('web/changepurchaseitem.html')
 
 
-@bp.route('/changepurchaseitem/delete', methods=['POST'])
+@router.api_route('/changepurchaseitem/delete', methods=['POST'])
 @login_required
 def change_purchase_item_delete():
     # 删除购买的物品信息
@@ -943,7 +962,7 @@ def change_purchase_item_delete():
     return render_template('web/changepurchaseitem.html')
 
 
-@bp.route('/updateusersave', methods=['POST', 'GET'])
+@router.api_route('/updateusersave', methods=['POST', 'GET'])
 @login_required
 def update_user_save():
     # 将用户存档覆盖到分数表中
@@ -999,7 +1018,7 @@ def update_user_save():
     return render_template('web/updateusersave.html')
 
 
-@bp.route('/allpresent', methods=['GET'])
+@router.api_route('/allpresent', methods=['GET'])
 @login_required
 def all_present():
     # 所有奖励数据
@@ -1035,14 +1054,14 @@ def all_present():
         return render_template('web/allpresent.html', posts=posts)
 
 
-@bp.route('/changepresent', methods=['GET'])
+@router.api_route('/changepresent', methods=['GET'])
 @login_required
 def change_present():
     # 修改奖励数据
     return render_template('web/changepresent.html')
 
 
-@bp.route('/changepresent/addpresent', methods=['POST'])
+@router.api_route('/changepresent/addpresent', methods=['POST'])
 @login_required
 def add_present():
     # 添加奖励数据
@@ -1078,7 +1097,7 @@ def add_present():
     return redirect(url_for('index.change_present'))
 
 
-@bp.route('/changepresent/deletepresent', methods=['POST'])
+@router.api_route('/changepresent/deletepresent', methods=['POST'])
 @login_required
 def delete_present():
     # 删除奖励数据
@@ -1091,7 +1110,7 @@ def delete_present():
     return redirect(url_for('index.change_present'))
 
 
-@bp.route('/deliverpresent', methods=['GET', 'POST'])
+@router.api_route('/deliverpresent', methods=['GET', 'POST'])
 @login_required
 def deliver_present():
     # 分发奖励
@@ -1147,7 +1166,7 @@ def deliver_present():
     return render_template('web/deliverpresent.html')
 
 
-@bp.route('/allredeem', methods=['GET'])
+@router.api_route('/allredeem', methods=['GET'])
 @login_required
 def all_redeem():
     # 所有兑换码数据
@@ -1182,14 +1201,14 @@ def all_redeem():
         return render_template('web/allredeem.html', posts=posts)
 
 
-@bp.route('/changeredeem', methods=['GET'])
+@router.api_route('/changeredeem', methods=['GET'])
 @login_required
 def change_redeem():
     # 修改兑换码数据
     return render_template('web/changeredeem.html')
 
 
-@bp.route('/changeredeem/addredeem', methods=['POST'])
+@router.api_route('/changeredeem/addredeem', methods=['POST'])
 @login_required
 def add_redeem():
     # 添加兑换码数据
@@ -1238,7 +1257,7 @@ def add_redeem():
     return redirect(url_for('index.change_redeem'))
 
 
-@bp.route('/changeredeem/deleteredeem', methods=['POST'])
+@router.api_route('/changeredeem/deleteredeem', methods=['POST'])
 @login_required
 def delete_redeem():
     # 删除兑换码数据
@@ -1251,7 +1270,7 @@ def delete_redeem():
     return redirect(url_for('index.change_redeem'))
 
 
-@bp.route('/redeem/<code>', methods=['GET'])
+@router.api_route('/redeem/{code}', methods=['GET'])
 @login_required
 def one_redeem(code):
     # 某个兑换码的用户使用情况数据
@@ -1278,7 +1297,7 @@ def one_redeem(code):
         return render_template('web/redeem.html', posts=posts, code=code)
 
 
-@bp.route('/changeuserpwd', methods=['GET', 'POST'])
+@router.api_route('/changeuserpwd', methods=['GET', 'POST'])
 @login_required
 def edit_userpwd():
     # 修改用户密码
@@ -1327,7 +1346,7 @@ def edit_userpwd():
     return redirect(url_for('index.edit_userpwd'))
 
 
-@bp.route('/banuser', methods=['POST', 'GET'])
+@router.api_route('/banuser', methods=['POST', 'GET'])
 @login_required
 def ban_user():
     # 封禁用户
@@ -1366,7 +1385,7 @@ def ban_user():
     return redirect(url_for('index.ban_user'))
 
 
-@bp.route('/banuser/deleteuserscore', methods=['POST'])
+@router.api_route('/banuser/deleteuserscore', methods=['POST'])
 @login_required
 def delete_user_score():
     # 删除用户所有成绩
@@ -1405,14 +1424,14 @@ def delete_user_score():
     return redirect(url_for('index.ban_user'))
 
 
-@bp.route('/changescore', methods=['GET'])
+@router.api_route('/changescore', methods=['GET'])
 @login_required
 def change_score():
     # 修改成绩页面
     return render_template('web/changescore.html')
 
 
-@bp.route('/changescore/delete', methods=['POST'])
+@router.api_route('/changescore/delete', methods=['POST'])
 @login_required
 def delete_score():
     # 删除成绩
