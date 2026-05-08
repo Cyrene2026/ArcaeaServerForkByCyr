@@ -12,7 +12,7 @@ class Config:
 
     SONG_FILE_HASH_PRE_CALCULATE = True
 
-    GAME_API_PREFIX = ['/coldwind/35', '/']  # str | list[str]
+    GAME_API_PREFIX = ['/steeptennis/40', '/']  # str | list[str]
     OLD_GAME_API_PREFIX = []  # str | list[str]
 
     ALLOW_APPVERSION = []  # list[str]
@@ -33,6 +33,7 @@ class Config:
 
     IS_APRILFOOLS = True
 
+    ENABLE_WORLD_RANK = True
     WORLD_RANK_MAX = 200
 
     AVAILABLE_MAP = []  # list[str]
@@ -74,7 +75,9 @@ class Config:
 
     CHARACTER_FULL_UNLOCK = True
     WORLD_SONG_FULL_UNLOCK = True
+    WORLD_SONG_FULL_UNLOCK_WITHOUT_MAP = False
     WORLD_SCENERY_FULL_UNLOCK = True
+    ONLINE_BANNER_FULL_UNLOCK = True
 
     SAVE_FULL_UNLOCK = False
 
@@ -100,6 +103,7 @@ class Config:
     DATABASE_INIT_PATH = './database/init/'
     SQLITE_LOG_DATABASE_PATH = './database/arcaea_log.db'
     SQLITE_DATABASE_DELETED_PATH = './database/arcaea_database_deleted.db'
+    LOG_FOLDER_PATH = './log/'
 
     GAME_LOGIN_RATE_LIMIT = '30/5 minutes'
     API_LOGIN_RATE_LIMIT = '10/5 minutes'

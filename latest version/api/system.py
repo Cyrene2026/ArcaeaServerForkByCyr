@@ -1,32 +1,33 @@
-from flask import Blueprint, request
+from typing import Any
 
+from fastapi import APIRouter, Depends
+
+from core.api_user import APIUser
 from core.error import ArcError
 from core.operation import BaseOperation
 
-from .api_auth import api_try, role_required
-from .api_code import success_return
+from .native import api_success, require_api_user
 
-bp = Blueprint('system', __name__, url_prefix='/system')
-
+router = APIRouter(prefix='/system', tags=['system'])
 
 operation_dict = {i._name: i for i in BaseOperation.__subclasses__()}
 
 
-@bp.route('/operations', methods=['GET'])
-@role_required(request, ['system'])
-@api_try
-def operations_get(user):
-    return success_return(list(operation_dict.keys()))
+@router.get('/operations')
+def operations_get(user: APIUser = Depends(require_api_user(['system']))):
+    return api_success(list(operation_dict.keys()))
 
 
-@bp.route('/operations/<string:operation_name>', methods=['POST'])
-@role_required(request, ['system'])
-@api_try
-def operations_operation_post(user, operation_name: str):
+@router.post('/operations/{operation_name}')
+def operations_operation_post(
+    operation_name: str,
+    data: dict[str, Any],
+    user: APIUser = Depends(require_api_user(['system'])),
+):
     if operation_name not in operation_dict:
         raise ArcError(
             f'No such operation: `{operation_name}`', api_error_code=-1, status=404)
     x = operation_dict[operation_name]()
-    x.set_params(**request.get_json())
+    x.set_params(**data)
     x.run()
-    return success_return()
+    return api_success()

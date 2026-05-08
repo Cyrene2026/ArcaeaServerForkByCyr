@@ -1,19 +1,17 @@
-from flask import Blueprint, request
+from fastapi import APIRouter, Depends, Request
 
 from core.error import NoData
 from core.mission import MISSION_DICT
 from core.sql import Connect
 from core.user import UserOnline
 
-from .auth import auth_required
-from .func import arc_try, success_return
+from .native import authed_user_id, form_data, game_success, is_error_response, server_try
 
-bp = Blueprint('mission', __name__, url_prefix='/mission')
+router = APIRouter(prefix='/mission', tags=['game-mission'])
 
 
 def parse_mission_form(multidict) -> list:
     r = []
-
     x = multidict.get('mission_1')
     i = 1
     while x:
@@ -23,46 +21,45 @@ def parse_mission_form(multidict) -> list:
     return r
 
 
-@bp.route('/me/clear', methods=['POST'])  # 新手任务确认完成
-@auth_required(request)
-@arc_try
-def mission_clear(user_id):
-    m = parse_mission_form(request.form)
+@router.post('/me/clear')
+@server_try
+async def mission_clear(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    m = parse_mission_form(form)
     r = []
     for i, mission_id in enumerate(m):
         if mission_id not in MISSION_DICT:
-            return NoData(f'Mission `{mission_id}` not found')
+            raise NoData(f'Mission `{mission_id}` not found')
         with Connect() as c:
             x = MISSION_DICT[mission_id](c)
             x.user_clear_mission(UserOnline(c, user_id))
             d = x.to_dict()
             d['request_id'] = i + 1
             r.append(d)
+    return game_success({'missions': r})
 
-    return success_return({'missions': r})
 
-
-@bp.route('/me/claim', methods=['POST'])  # 领取新手任务奖励
-@auth_required(request)
-@arc_try
-def mission_claim(user_id):
-    m = parse_mission_form(request.form)
+@router.post('/me/claim')
+@server_try
+async def mission_claim(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    m = parse_mission_form(form)
     r = []
-
     with Connect() as c:
         user = UserOnline(c, user_id)
-
         for i, mission_id in enumerate(m):
             if mission_id not in MISSION_DICT:
-                return NoData(f'Mission `{mission_id}` not found')
-
+                raise NoData(f'Mission `{mission_id}` not found')
             x = MISSION_DICT[mission_id](c)
             x.user_claim_mission(user)
             d = x.to_dict(has_items=True)
             d['request_id'] = i + 1
             r.append(d)
-
-        return success_return({
+        return game_success({
             'missions': r,
             'user': user.to_dict()
         })

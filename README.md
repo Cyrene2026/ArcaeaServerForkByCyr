@@ -4,11 +4,11 @@
 
 ## 简介 Introduction
 
-这是基于 Python 以及 Flask 的微型本地 Arcaea 服务器，可以模拟游戏的主要功能。这可能是我第一次写这种大程序，若有不妥之处，敬请谅解。  
+这是基于 Python 以及 FastAPI 的微型本地 Arcaea 服务器，可以模拟游戏的主要功能。这可能是我第一次写这种大程序，若有不妥之处，敬请谅解。  
 
 本程序主要用于学习研究，不得用于任何商业行为，否则后果自负，这不是强制要求，只是一个提醒与警告。  
 
-This is a small local Arcaea server based on Python and Flask, which can simulate the main functions of the game. This may be the first time I have written such a large program. Please understand if there is something wrong with it.  
+This is a small local Arcaea server based on Python and FastAPI, which can simulate the main functions of the game. This may be the first time I have written such a large program. Please understand if there is something wrong with it.  
 
 This procedure is mainly used for study and research, and shall not be used for any commercial activities, otherwise the consequences will be borne by oneself. This is not a mandatory requirement, just a reminder and warning.
 
@@ -113,8 +113,10 @@ It is just so interesting. What it can do is under exploration.
 ## 运行环境与依赖 Running environment and requirements
 
 - Windows / Linux / Mac OS / Android...
-- Python >= 3.6
-  - Flask >= 2.0
+- Python >= 3.10
+  - FastAPI >= 0.110
+  - Uvicorn >= 0.27
+  - Pydantic >= 2.0
   - Cryptography >= 35.0.0
   - limits >= 2.7.0
 - Charles, IDA, proxy app... (optional)

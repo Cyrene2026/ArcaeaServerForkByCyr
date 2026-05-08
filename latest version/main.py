@@ -7,25 +7,22 @@ from core.config_manager import Config, ConfigManager
 
 if os.path.exists('config.py') or os.path.exists('config'):
     # 导入用户自定义配置
-    ConfigManager.load(import_module('config').Config)
-
-if Config.DEPLOY_MODE == 'gevent':
-    # 异步
-    from gevent import monkey
-    monkey.patch_all()
-
+    ConfigManager.load(import_module("config").Config)
+    # TODO: More config file formats
 
 import sys
 from logging.config import dictConfig
-from multiprocessing import Process, set_start_method
+from multiprocessing import Process, current_process, set_start_method
 from traceback import format_exc
 
-from flask import Flask, make_response, request, send_from_directory
+from fastapi import Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
+from flask import Flask
 
 import api
 import server
-import web.index
-import web.login
+import web
 # import webapi
 from core.bundle import BundleDownload
 from core.constant import Constant
@@ -33,52 +30,60 @@ from core.download import UserDownload
 from core.error import ArcError, NoAccess, RateLimit
 from core.init import FileChecker
 from core.sql import Connect
-from server.func import error_return
+from server.native import game_error
 
 app = Flask(__name__)
 
 if Config.USE_PROXY_FIX:
     # 代理修复
-    from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    pass
 if Config.USE_CORS:
     # 服务端跨域
-    from flask_cors import CORS
-    CORS(app, supports_credentials=True)
+    app.fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
-os.chdir(sys.path[0])  # 更改工作路径，以便于愉快使用相对路径
+os.chdir(os.path.dirname(os.path.abspath(__file__)))  # 更改工作路径，以便于愉快使用相对路径
 
 
 app.config.from_mapping(SECRET_KEY=Config.SECRET_KEY)
 app.config['SESSION_TYPE'] = 'filesystem'
-app.register_blueprint(web.login.bp)
-app.register_blueprint(web.index.bp)
-app.register_blueprint(api.bp)
-list(map(app.register_blueprint, server.get_bps()))
-# app.register_blueprint(webapi.bp)
+web.register_routers(app)
+server.register_routers(app.fastapi_app)
+api.register_routers(app.fastapi_app)
+# webapi is superseded by api.register_routers().
 
 
-@app.route('/')
+@app.fastapi_app.get('/swagger', include_in_schema=False)
+def swagger():
+    return RedirectResponse('/docs')
+
+
+@app.fastapi_app.get('/', response_class=PlainTextResponse)
 def hello():
     return "Hello World!"
 
 
-@app.route('/favicon.ico', methods=['GET'])  # 图标
+@app.fastapi_app.get('/favicon.ico')  # 图标
 def favicon():
     # Pixiv ID: 82374369
     # 我觉得这张图虽然并不是那么精细，但很有感觉，色彩的强烈对比下给人带来一种惊艳
     # 然后在压缩之下什么也看不清了:(
 
-    return app.send_static_file('favicon.ico')
+    return FileResponse(os.path.join(app.static_folder, 'favicon.ico'))
 
 
-@app.route('/download/<path:file_path>', methods=['GET'])  # 下载
-def download(file_path):
+@app.fastapi_app.get('/download/{file_path:path}', name='download')  # 下载
+def download(file_path: str, request: Request):
     with Connect(in_memory=True) as c:
         try:
             x = UserDownload(c)
-            x.token = request.args.get('t')
+            x.token = request.query_params.get('t')
             x.song_id, x.file_name = file_path.split('/', 1)
             x.select_for_check()
             if x.is_limited:
@@ -89,44 +94,84 @@ def download(file_path):
             x.download_hit()
             if Config.DOWNLOAD_USE_NGINX_X_ACCEL_REDIRECT:
                 # nginx X-Accel-Redirect
-                response = make_response()
+                response = Response()
                 response.headers['Content-Type'] = 'application/octet-stream'
                 response.headers['X-Accel-Redirect'] = Config.NGINX_X_ACCEL_REDIRECT_PREFIX + file_path
                 return response
-            return send_from_directory(Constant.SONG_FILE_FOLDER_PATH, file_path, as_attachment=True, conditional=True)
+            return FileResponse(os.path.join(Constant.SONG_FILE_FOLDER_PATH, file_path), filename=os.path.basename(file_path))
         except ArcError as e:
             if Config.ALLOW_WARNING_LOG:
                 app.logger.warning(format_exc())
-            return error_return(e)
-    return error_return()
+            return game_error(e)
+    return game_error()
 
 
-@app.route('/bundle_download/<string:token>', methods=['GET'])  # 热更新下载
-def bundle_download(token: str):
+@app.fastapi_app.get('/bundle_download/{token}', name='bundle_download')  # 热更新下载
+def bundle_download(token: str, request: Request):
     with Connect(in_memory=True) as c_m:
         try:
+            app.logger.info('[bundle_download] request start ip=%s token=%s...',
+                            request.client.host if request.client else '', token[:12])
             file_path = BundleDownload(c_m).get_path_by_token(
-                token, request.remote_addr)
+                token, request.client.host if request.client else '')
+            abs_path = os.path.join(
+                Constant.CONTENT_BUNDLE_FOLDER_PATH, file_path)
+            app.logger.info(
+                '[bundle_download] resolved token=%s... file_path=%s abs_path=%s exists=%s',
+                token[:12],
+                file_path,
+                abs_path,
+                os.path.isfile(abs_path)
+            )
             if Config.DOWNLOAD_USE_NGINX_X_ACCEL_REDIRECT:
                 # nginx X-Accel-Redirect
-                response = make_response()
+                response = Response()
                 response.headers['Content-Type'] = 'application/octet-stream'
                 response.headers['X-Accel-Redirect'] = Config.BUNDLE_NGINX_X_ACCEL_REDIRECT_PREFIX + file_path
+                app.logger.info(
+                    '[bundle_download] response x_accel token=%s... redirect=%s',
+                    token[:12],
+                    response.headers['X-Accel-Redirect']
+                )
                 return response
-            return send_from_directory(Constant.CONTENT_BUNDLE_FOLDER_PATH, file_path, as_attachment=True, conditional=True)
+            app.logger.info('[bundle_download] response send_file token=%s... file_path=%s',
+                            token[:12], file_path)
+            return FileResponse(os.path.join(Constant.CONTENT_BUNDLE_FOLDER_PATH, file_path), filename=os.path.basename(file_path))
         except ArcError as e:
             if Config.ALLOW_WARNING_LOG:
                 app.logger.warning(format_exc())
-            return error_return(e)
-    return error_return()
+            app.logger.warning(
+                '[bundle_download] arc_error token=%s... status=%s error_code=%s message=%s',
+                token[:12],
+                e.status,
+                e.error_code,
+                e
+            )
+            return game_error(e)
+        except Exception:
+            app.logger.error(
+                '[bundle_download] unhandled_error token=%s...\n%s',
+                token[:12],
+                format_exc()
+            )
+            raise
+    return game_error()
+
+
+app._routes['download'] = '/download/{file_path:path}'
+app._route_params['download'] = ['file_path']
+app._routes['bundle_download'] = '/bundle_download/{token}'
+app._route_params['bundle_download'] = ['token']
 
 
 if Config.DEPLOY_MODE == 'waitress':
     # 给waitress加个日志
-    @app.after_request
-    def after_request(response):
+    @app.fastapi_app.middleware('http')
+    async def after_request(request: Request, call_next):
+        response = await call_next(request)
+        client_host = request.client.host if request.client else ''
         app.logger.info(
-            f'{request.remote_addr} - - {request.method} {request.path} {response.status_code}')
+            f'{client_host} - - {request.method} {request.url.path} {response.status_code}')
         return response
 
 # @app.before_request
@@ -137,25 +182,22 @@ if Config.DEPLOY_MODE == 'waitress':
 
 
 def tcp_server_run():
-    if Config.DEPLOY_MODE == 'gevent':
-        # 异步 gevent WSGI server
-        host_port = (Config.HOST, Config.PORT)
-        app.logger.info('Running gevent WSGI server... (%s:%s)' % host_port)
-        from gevent.pywsgi import WSGIServer
-        WSGIServer(host_port, app, log=app.logger).serve_forever()
-    elif Config.DEPLOY_MODE == 'waitress':
-        # waitress WSGI server
-        import logging
-        from waitress import serve  # type: ignore
-        logger = logging.getLogger('waitress')
-        logger.setLevel(logging.INFO)
-        serve(app, host=Config.HOST, port=Config.PORT)
-    else:
-        if Config.SSL_CERT and Config.SSL_KEY:
-            app.run(Config.HOST, Config.PORT, ssl_context=(
-                Config.SSL_CERT, Config.SSL_KEY))
-        else:
-            app.run(Config.HOST, Config.PORT)
+    import uvicorn
+
+    app.logger.info(
+        'Running FastAPI ASGI server... (%s:%s, deploy_mode=%s)',
+        Config.HOST,
+        Config.PORT,
+        Config.DEPLOY_MODE,
+    )
+    uvicorn.run(
+        app.fastapi_app,
+        host=Config.HOST,
+        port=Config.PORT,
+        ssl_certfile=Config.SSL_CERT or None,
+        ssl_keyfile=Config.SSL_KEY or None,
+        proxy_headers=Config.USE_PROXY_FIX,
+    )
 
 
 def generate_log_file_dict(level: str, filename: str) -> dict:
@@ -170,7 +212,7 @@ def generate_log_file_dict(level: str, filename: str) -> dict:
     }
 
 
-def main():
+def pre_main():
     log_dict = {
         'version': 1,
         'root': {
@@ -180,10 +222,10 @@ def main():
         'handlers': {
             'wsgi': {
                 'class': 'logging.StreamHandler',
-                'stream': 'ext://flask.logging.wsgi_errors_stream',
+                'stream': 'ext://sys.stderr',
                 'formatter': 'default'
             },
-            "error_file": generate_log_file_dict('ERROR', './log/error.log')
+            "error_file": generate_log_file_dict('ERROR', f'{Config.LOG_FOLDER_PATH}/error.log')
         },
         'formatters': {
             'default': {
@@ -194,11 +236,11 @@ def main():
     if Config.ALLOW_INFO_LOG:
         log_dict['root']['handlers'].append('info_file')
         log_dict['handlers']['info_file'] = generate_log_file_dict(
-            'INFO', './log/info.log')
+            'INFO', f'{Config.LOG_FOLDER_PATH}/info.log')
     if Config.ALLOW_WARNING_LOG:
         log_dict['root']['handlers'].append('warning_file')
         log_dict['handlers']['warning_file'] = generate_log_file_dict(
-            'WARNING', './log/warning.log')
+            'WARNING', f'{Config.LOG_FOLDER_PATH}/warning.log')
 
     dictConfig(log_dict)
 
@@ -208,6 +250,8 @@ def main():
         input('Press ENTER key to exit.')
         sys.exit()
 
+
+def main():
     if Config.LINKPLAY_HOST and Config.SET_LINKPLAY_SERVER_AS_SUB_PROCESS:
         from linkplay_server import link_play
         process = [Process(target=link_play, args=(
@@ -222,6 +266,11 @@ def main():
     else:
         tcp_server_run()
 
+
+# must run for init
+# this ensures avoiding duplicate init logs for some reason
+if current_process().name == 'MainProcess':
+    pre_main()
 
 if __name__ == '__main__':
     set_start_method("spawn")

@@ -1,32 +1,31 @@
-from flask import Blueprint, request
+from fastapi import APIRouter, Depends
 
 from core.present import UserPresent, UserPresentList
 from core.sql import Connect
 from core.user import UserOnline
 
-from .auth import auth_required
-from .func import arc_try, success_return
+from .native import authed_user_id, game_success, is_error_response, server_try
 
-bp = Blueprint('present', __name__, url_prefix='/present')
+router = APIRouter(prefix='/present', tags=['game-present'])
 
 
-@bp.route('/me', methods=['GET'])  # 用户奖励信息
-@auth_required(request)
-@arc_try
-def present_info(user_id):
+@router.get('/me')
+@server_try
+def present_info(user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     with Connect() as c:
         x = UserPresentList(c, UserOnline(c, user_id))
         x.select_user_presents()
+        return game_success(x.to_dict_list())
 
-        return success_return(x.to_dict_list())
 
-
-@bp.route('/me/claim/<present_id>', methods=['POST'])  # 礼物确认
-@auth_required(request)
-@arc_try
-def claim_present(user_id, present_id):
+@router.post('/me/claim/{present_id}')
+@server_try
+def claim_present(present_id: str, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     with Connect() as c:
         x = UserPresent(c, UserOnline(c, user_id))
         x.claim_user_present(present_id)
-
-        return success_return()
+        return game_success()

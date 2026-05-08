@@ -1,6 +1,7 @@
-from flask import jsonify
+from fastapi.responses import JSONResponse
 
 from core.error import ArcError
+from core.response_models import ApiErrorResponse, ApiSuccessResponse, to_jsonable
 
 default_error = ArcError('Unknown Error')
 
@@ -38,8 +39,12 @@ CODE_MSG = {
 
 
 def success_return(data: dict = {}, status: int = 200, msg: str = ''):
-    return jsonify({'code': 0, 'data': data, 'msg': msg}), status
+    return JSONResponse(to_jsonable(ApiSuccessResponse(data=data, msg=msg)), status_code=status)
 
 
 def error_return(e: 'ArcError' = default_error, status: int = 200):
-    return jsonify({'code': e.api_error_code, 'data': {} if e.extra_data is None else e.extra_data, 'msg': CODE_MSG[e.api_error_code] if e.message is None else e.message}), status
+    return JSONResponse(to_jsonable(ApiErrorResponse(
+        code=e.api_error_code,
+        data={} if e.extra_data is None else e.extra_data,
+        msg=CODE_MSG[e.api_error_code] if e.message is None else e.message
+    )), status_code=status)

@@ -1,116 +1,159 @@
 import json
+import inspect
+from time import perf_counter
 from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
 
-from flask import Blueprint, jsonify, request
-from werkzeug.datastructures import ImmutableMultiDict
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+from starlette.datastructures import QueryParams
 
 from core.bundle import BundleDownload
+from core.character import UserCharacter
 from core.download import DownloadList
-from core.error import RateLimit, ArcError
+from core.error import ArcError, RateLimit
 from core.item import ItemCharacter
 from core.notification import NotificationFactory
 from core.sql import Connect
 from core.system import GameInfo
 from core.user import UserOnline
 
-from .auth import auth_required
-from .func import arc_try, error_return, success_return
+from .native import authed_user_id, game_error, game_success, is_error_response, logger, server_try
 from .present import present_info
 from .purchase import bundle_bundle, bundle_pack, get_single
+from .schemas import SongScoreQuery
 from .score import song_score_friend
 from .user import user_me
 from .world import world_all
 
-bp = Blueprint('others', __name__)
+router = APIRouter(tags=['game-others'])
 
 
-@bp.route('/game/info', methods=['GET'])  # 系统信息
-def game_info():
-    return success_return(GameInfo().to_dict())
+def _parse_bool(value: str | None, default: bool = True) -> bool:
+    if value is None:
+        return default
+    return json.loads(value)
 
 
-@bp.route('/notification/me', methods=['GET'])  # 通知
-@auth_required(request)
-@arc_try
-def notification_me(user_id):
-    with Connect(in_memory=True) as c_m:
-        x = NotificationFactory(c_m, UserOnline(c_m, user_id))
-        return success_return([i.to_dict() for i in x.get_notification()])
+def _response_json(response) -> dict:
+    if isinstance(response, JSONResponse):
+        return json.loads(response.body.decode() or '{}')
+    return response
 
 
-@bp.route('/game/content_bundle', methods=['GET'])  # 热更新
-@arc_try
-def game_content_bundle():
-    # error code 5, 9 work
-    app_version = request.headers.get('AppVersion')
-    bundle_version = request.headers.get('ContentBundle')
-    device_id = request.headers.get('DeviceId')
-    with Connect(in_memory=True) as c_m:
-        x = BundleDownload(c_m)
-        x.set_client_info(app_version, bundle_version, device_id)
-        return success_return({
-            'orderedResults': x.get_bundle_list()
-        })
+async def _resolve_response(response):
+    if inspect.isawaitable(response):
+        response = await response
+    return _response_json(response)
 
 
-@bp.route('/serve/download/me/song', methods=['GET'])  # 歌曲下载
-@auth_required(request)
-@arc_try
-def download_song(user_id):
+def _download_song(params: QueryParams, user_id: int):
     with Connect(in_memory=True) as c_m:
         with Connect() as c:
             x = DownloadList(c_m, UserOnline(c, user_id))
-            x.song_ids = request.args.getlist('sid')
-            x.url_flag = json.loads(request.args.get('url', 'true'))
+            x.song_ids = params.getlist('sid')
+            x.url_flag = _parse_bool(params.get('url'), True)
             if x.url_flag and x.is_limited:
                 raise RateLimit('You have reached the download limit.', 903)
 
             x.add_songs()
-            return success_return(x.urls)
+            return game_success(x.urls)
 
 
-@bp.route('/finale/progress', methods=['GET'])
+@router.get('/game/info')
+def game_info():
+    return game_success(GameInfo().to_dict())
+
+
+@router.get('/notification/me')
+@server_try
+def notification_me(user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    with Connect(in_memory=True) as c_m:
+        x = NotificationFactory(c_m, UserOnline(c_m, user_id))
+        return game_success([i.to_dict() for i in x.get_notification()])
+
+
+@router.get('/game/content_bundle')
+@server_try
+def game_content_bundle(request: Request):
+    trace_id = uuid4().hex[:12]
+    start_time = perf_counter()
+    app_version = request.headers.get('AppVersion')
+    bundle_version = request.headers.get('ContentBundle')
+    device_id = request.headers.get('DeviceId')
+    logger.info(
+        '[content_bundle:%s] request start ip=%s app_version=%s content_bundle=%s device_id=%s user_agent=%s',
+        trace_id,
+        request.client.host if request.client else '',
+        app_version,
+        bundle_version,
+        device_id,
+        request.headers.get('User-Agent'),
+    )
+    with Connect(in_memory=True) as c_m:
+        x = BundleDownload(c_m, trace_id=trace_id)
+        x.set_client_info(app_version, bundle_version, device_id)
+        bundles = x.get_bundle_list()
+        versions = [i.get('contentBundleVersion') for i in bundles]
+        logger.info(
+            '[content_bundle:%s] response bundle_count=%s versions=%s elapsed_ms=%.2f',
+            trace_id,
+            len(bundles),
+            versions,
+            (perf_counter() - start_time) * 1000,
+        )
+        return game_success({'orderedResults': bundles})
+
+
+@router.get('/serve/download/me/song')
+@server_try
+def download_song(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    return _download_song(request.query_params, user_id)
+
+
+@router.get('/finale/progress')
 def finale_progress():
-    # 世界boss血条
-    return success_return({'percentage': 100000})
+    return game_success({'percentage': 100000})
 
 
-@bp.route('/finale/finale_start', methods=['POST'])
-@auth_required(request)
-@arc_try
-def finale_start(user_id):
-    # testify开始，对立再见
-    # 但是对立不再见
-
+@router.post('/finale/finale_start')
+@server_try
+def finale_start(user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     with Connect() as c:
         item = ItemCharacter(c)
-        item.set_id('55')  # Hikari (Fatalis)
+        item.set_id('55')
         item.user_claim_item(UserOnline(c, user_id))
-        return success_return({})
+        return game_success({})
 
 
-@bp.route('/finale/finale_end', methods=['POST'])
-@auth_required(request)
-@arc_try
-def finale_end(user_id):
-
+@router.post('/finale/finale_end')
+@server_try
+def finale_end(user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     with Connect() as c:
         item = ItemCharacter(c)
-        item.set_id('5')  # Hikari & Tairitsu (Reunion)
+        item.set_id('5')
         item.user_claim_item(UserOnline(c, user_id))
-        return success_return({})
+        return game_success({})
 
 
-@bp.route('/insight/me/complete/<string:pack_id>', methods=['POST'])
-@auth_required(request)
-@arc_try
-def insight_complete(user_id, pack_id):
-    # insight state change
+@router.post('/insight/me/complete/{pack_id}')
+@server_try
+def insight_complete(pack_id: str, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     with Connect() as c:
         u = UserOnline(c, user_id)
         if pack_id == 'eden_append_1':
             item = ItemCharacter(c)
-            item.set_id('72')  # Insight (Ascendant - 8th Seeker)
+            item.set_id('72')
             item.user_claim_item(u)
             u.update_user_one_column('insight_state', 1)
         elif pack_id == 'lephon':
@@ -118,68 +161,82 @@ def insight_complete(user_id, pack_id):
         else:
             raise ArcError('Invalid pack_id', 151, status=404)
 
-        return success_return({
-            'insight_state': u.insight_state
+        return game_success({'insight_state': u.insight_state})
+
+
+@router.post('/unlock/me/awaken_maya')
+@server_try
+def awaken_maya(user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    with Connect() as c:
+        ch = UserCharacter(c, 71, UserOnline(c, user_id))
+        ch.select_character_info()
+        try:
+            ch.character_uncap()
+        except ArcError:
+            pass
+
+        return game_success({
+            'user_id': user_id,
+            'updated_characters': [ch.to_dict()],
         })
 
 
-@bp.route('/applog/me/log', methods=['POST'])
+@router.post('/applog/me/log')
 def applog_me():
-    # 异常日志，不处理
-    return success_return({})
+    return game_success({})
 
 
-map_dict = {
-    '/user/me': user_me,
-    '/purchase/bundle/pack': bundle_pack,
-    '/serve/download/me/song': download_song,
-    '/game/info': game_info,
-    '/present/me': present_info,
-    '/world/map/me': world_all,
-    '/score/song/friend': song_score_friend,
-    '/purchase/bundle/bundle': bundle_bundle,
-    '/finale/progress': finale_progress,
-    '/purchase/bundle/single': get_single
-}
+def _aggregate_map(endpoint: str, user_id: int):
+    parsed = urlparse(endpoint)
+    params = QueryParams([
+        (key, item)
+        for key, values in parse_qs(parsed.query).items()
+        for item in values
+    ])
+    return {
+        '/user/me': lambda: user_me(user_id=user_id),
+        '/purchase/bundle/pack': lambda: bundle_pack(user_id=user_id),
+        '/serve/download/me/song': lambda: _download_song(params, user_id),
+        '/game/info': game_info,
+        '/present/me': lambda: present_info(user_id=user_id),
+        '/world/map/me': lambda: world_all(user_id=user_id),
+        '/score/song/friend': lambda: song_score_friend(data=SongScoreQuery(**dict(params)), user_id=user_id),
+        '/purchase/bundle/bundle': bundle_bundle,
+        '/finale/progress': finale_progress,
+        '/purchase/bundle/single': lambda: get_single(user_id=user_id),
+    }[parsed.path]()
 
 
-@bp.route('/compose/aggregate', methods=['GET'])  # 集成式请求
-def aggregate():
+@router.get('/compose/aggregate')
+@server_try
+async def aggregate(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
     try:
-        # global request
-        finally_response = {'success': True, 'value': []}
-        # request_ = request
-        get_list = json.loads(request.args.get('calls'))
+        get_list = json.loads(request.query_params.get('calls'))
         if len(get_list) > 10:
-            # 请求太多驳回
-            return error_return()
+            return game_error()
 
-        for i in get_list:
-            endpoint = i['endpoint']
-            request.args = ImmutableMultiDict(
-                {key: value[0] for key, value in parse_qs(urlparse(endpoint).query).items()})
+        response = {'success': True, 'value': []}
+        for call in get_list:
+            data = await _resolve_response(_aggregate_map(call['endpoint'], user_id))
+            if isinstance(data, dict) and data.get('success') is False:
+                error = {
+                    'success': False,
+                    'error_code': data.get('error_code'),
+                    'id': call['id'],
+                }
+                if 'extra' in data:
+                    error['extra'] = data['extra']
+                return JSONResponse(error)
 
-            resp_t = map_dict[urlparse(endpoint).path]()
-            if isinstance(resp_t, tuple):
-                # The response may be a tuple, if it is an error response
-                resp_t = resp_t[0]
+            response['value'].append({
+                'id': call.get('id'),
+                'value': data['value'] if isinstance(data, dict) and 'value' in data else data,
+            })
 
-            if hasattr(resp_t, "response"):
-                resp_t = resp_t.response[0].decode().rstrip('\n')
-            resp = json.loads(resp_t)
-
-            if hasattr(resp, 'get') and resp.get('success') is False:
-                finally_response = {'success': False, 'error_code': resp.get(
-                    'error_code'), 'id': i['id']}
-                if "extra" in resp:
-                    finally_response['extra'] = resp['extra']
-                # request = request_
-                return jsonify(finally_response)
-
-            finally_response['value'].append(
-                {'id': i.get('id'), 'value': resp['value'] if hasattr(resp, 'get') else resp})
-
-        # request = request_
-        return jsonify(finally_response)
-    except KeyError:
-        return error_return()
+        return JSONResponse(response)
+    except (KeyError, TypeError, json.JSONDecodeError):
+        return game_error()
