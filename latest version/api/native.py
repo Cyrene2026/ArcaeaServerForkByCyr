@@ -2,31 +2,21 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-<<<<<<< HEAD
 from fastapi import FastAPI, Request, Security
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
-=======
-from fastapi import FastAPI, Header, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
->>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 from pydantic import BaseModel, ConfigDict
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from core.api_user import APIUser
 from core.config_manager import Config
 from core.error import ArcError, InputError, NoAccess, PostError
-<<<<<<< HEAD
 from core.response_models import ApiErrorResponse, ApiSuccessResponse, GameErrorResponse, to_jsonable
-=======
->>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 from core.sql import Connect
 
 from .api_code import CODE_MSG
 
-<<<<<<< HEAD
 api_token_header = APIKeyHeader(name='Token', auto_error=False)
 api_responses = {
     200: {'model': ApiSuccessResponse, 'description': 'API success envelope'},
@@ -36,8 +26,6 @@ api_responses = {
     500: {'model': ApiErrorResponse, 'description': 'Server error envelope'},
 }
 
-=======
->>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 class ApiResponseException(Exception):
     def __init__(self, response: JSONResponse) -> None:
@@ -83,11 +71,7 @@ def api_error(e: ArcError, status: int | None = None) -> JSONResponse:
 
 
 def require_api_user(powers: list[str]) -> Callable:
-<<<<<<< HEAD
     def dependency(token: str | None = Security(api_token_header)) -> APIUser:
-=======
-    def dependency(token: str | None = Header(default=None, alias='Token')) -> APIUser:
->>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         if token is None:
             raise ApiResponseException(
                 api_error(PostError('No token', api_error_code=-1), 401))
@@ -130,15 +114,12 @@ async def arc_error_exception_handler(request: Request, exc: ArcError):
 
 
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
-<<<<<<< HEAD
     if not request.url.path.startswith('/api/v1'):
         return JSONResponse(
             to_jsonable(GameErrorResponse(error_code=5, extra=exc.errors())),
             status_code=400,
         )
 
-=======
->>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     first_error = exc.errors()[0] if exc.errors() else {}
     if first_error.get('type') == 'json_invalid':
         return api_error(
