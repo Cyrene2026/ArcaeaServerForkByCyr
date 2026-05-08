@@ -1,9 +1,12 @@
+以下是基于原作者的readme小改而来
+---
 # Arcaea-server
 
 一个微型的 Arcaea 本地服务器  A small local server for Arcaea
 
 ## 简介 Introduction
 
+<<<<<<< HEAD
 这是基于 Python 以及 FastAPI 的微型本地 Arcaea 服务器，可以模拟游戏的主要功能。这可能是我第一次写这种大程序，若有不妥之处，敬请谅解。  
 
 本程序主要用于学习研究，不得用于任何商业行为，否则后果自负，这不是强制要求，只是一个提醒与警告。  
@@ -11,6 +14,9 @@
 This is a small local Arcaea server based on Python and FastAPI, which can simulate the main functions of the game. This may be the first time I have written such a large program. Please understand if there is something wrong with it.  
 
 This procedure is mainly used for study and research, and shall not be used for any commercial activities, otherwise the consequences will be borne by oneself. This is not a mandatory requirement, just a reminder and warning.
+=======
+本人发现该项目如果不加引导，直接这样，会误导人家，故重新整了下，用fastapi搞了下，能跑
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 > 虽然看起来很蠢，但是可以用！
 > It looks stupid, but it works!
@@ -168,14 +174,12 @@ It is just so interesting. What it can do is under exploration.
 
 ## 联系方式 Contact
 
-如有必要，可以联系本人 Contact me if necessary  
+如有必要，请联系原作者： 
 邮箱 Email：arcaea@lost-msth.cn
 
 ## 支持一下 Support me
-
-生活不易。 Life is not easy.  
-[支付宝 Alipay](https://github.com/Lost-MSth/Arcaea-server/blob/master/pic/Alipay.jpg)  
-[微信 WeChat](https://github.com/Lost-MSth/Arcaea-server/blob/master/pic/WeChat.png)
+  
+这里不放作者链接了，请找原作者支持就行了
 
 ## 使用许可 Use license
 

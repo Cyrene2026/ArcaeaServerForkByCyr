@@ -29,6 +29,7 @@ from .world import world_all
 router = APIRouter(tags=['game-others'])
 
 
+<<<<<<< HEAD
 def _parse_bool(value: str | None, default: bool = True) -> bool:
     if value is None:
         return default
@@ -47,6 +48,31 @@ async def _resolve_response(response):
     return _response_json(response)
 
 
+=======
+class AggregateRequest:
+    def __init__(self, params: QueryParams) -> None:
+        self.query_params = params
+
+
+def _parse_bool(value: str | None, default: bool = True) -> bool:
+    if value is None:
+        return default
+    return json.loads(value)
+
+
+def _response_json(response) -> dict:
+    if isinstance(response, JSONResponse):
+        return json.loads(response.body.decode() or '{}')
+    return response
+
+
+async def _resolve_response(response):
+    if inspect.isawaitable(response):
+        response = await response
+    return _response_json(response)
+
+
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 def _download_song(params: QueryParams, user_id: int):
     with Connect(in_memory=True) as c_m:
         with Connect() as c:
@@ -195,6 +221,10 @@ def _aggregate_map(endpoint: str, user_id: int):
         for key, values in parse_qs(parsed.query).items()
         for item in values
     ])
+<<<<<<< HEAD
+=======
+    fake_request = AggregateRequest(params)
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     return {
         '/user/me': lambda: user_me(user_id=user_id),
         '/purchase/bundle/pack': lambda: bundle_pack(user_id=user_id),
@@ -202,7 +232,11 @@ def _aggregate_map(endpoint: str, user_id: int):
         '/game/info': game_info,
         '/present/me': lambda: present_info(user_id=user_id),
         '/world/map/me': lambda: world_all(user_id=user_id),
+<<<<<<< HEAD
         '/score/song/friend': lambda: song_score_friend(data=SongScoreQuery(**dict(params)), user_id=user_id),
+=======
+        '/score/song/friend': lambda: song_score_friend(request=fake_request, user_id=user_id),
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         '/purchase/bundle/bundle': bundle_bundle,
         '/finale/progress': finale_progress,
         '/purchase/bundle/single': lambda: get_single(user_id=user_id),

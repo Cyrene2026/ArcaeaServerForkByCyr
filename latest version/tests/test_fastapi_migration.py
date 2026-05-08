@@ -115,6 +115,7 @@ class FastAPIMigrationTest(unittest.TestCase):
         self.assertEqual(bad_item_update.status_code, 200)
         self.assertEqual(bad_item_update.json()['code'], -101)
 
+<<<<<<< HEAD
     def test_openapi_documents_security_responses_and_game_payloads(self):
         response = self.client.get('/openapi.json')
         self.assertEqual(response.status_code, 200)
@@ -145,6 +146,8 @@ class FastAPIMigrationTest(unittest.TestCase):
         multiplayer_body = schema['paths']['/steeptennis/40/multiplayer/me/room/create']['post']['requestBody']['content']
         self.assertIn('application/json', multiplayer_body)
 
+=======
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 if __name__ == '__main__':
     unittest.main()

@@ -12,13 +12,17 @@ from core.sql import Connect
 from core.user import User, UserLogin, UserOnline, UserRegister
 
 from .native import authed_user_id, form_data, form_get, game_success, header_check, is_error_response, server_try
+<<<<<<< HEAD
 from .schemas import CharacterChangeForm, CharacterExpForm, GameRegisterForm, UserSettingForm
+=======
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 router = APIRouter(prefix='/user', tags=['game-user'])
 account_router = APIRouter(prefix='/account', tags=['game-account'])
 logger = logging.getLogger('main')
 
 
+<<<<<<< HEAD
 async def _register_impl(request: Request, payload: GameRegisterForm):
     error = header_check(request)
     if error is not None:
@@ -31,6 +35,21 @@ async def _register_impl(request: Request, payload: GameRegisterForm):
         device_id = payload.device_id
         if payload.is_allow_marketing_email is not None:
             new_user.is_allow_marketing_email = payload.is_allow_marketing_email == 'true'
+=======
+async def _register_impl(request: Request):
+    error = header_check(request)
+    if error is not None:
+        raise error
+    form = await form_data(request)
+    with Connect() as c:
+        new_user = UserRegister(c)
+        new_user.set_name(form['name'])
+        new_user.set_password(form['password'])
+        new_user.set_email(form['email'])
+        device_id = form['device_id'] if 'device_id' in form else 'low_version'
+        if 'is_allow_marketing_email' in form:
+            new_user.is_allow_marketing_email = form['is_allow_marketing_email'] == 'true'
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         ip = request.client.host if request.client else ''
         new_user.register(device_id, ip)
         user = UserLogin(c)
@@ -42,8 +61,13 @@ async def _register_impl(request: Request, payload: GameRegisterForm):
 @router.post('')
 @account_router.post('')
 @server_try
+<<<<<<< HEAD
 async def register(request: Request, payload: GameRegisterForm = Depends(GameRegisterForm.as_form)):
     return await _register_impl(request, payload)
+=======
+async def register(request: Request):
+    return await _register_impl(request)
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 
 @router.get('/me')
@@ -68,12 +92,23 @@ def toggle_invasion(user_id=Depends(authed_user_id)):
 
 @router.post('/me/character')
 @server_try
+<<<<<<< HEAD
 async def character_change(payload: CharacterChangeForm = Depends(CharacterChangeForm.as_form), user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
     with Connect() as c:
         user = UserOnline(c, user_id)
         user.change_character(payload.character, payload.skill_sealed == 'true')
+=======
+async def character_change(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    with Connect() as c:
+        user = UserOnline(c, user_id)
+        user.change_character(
+            int(form['character']), form['skill_sealed'] == 'true')
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         return game_success({'user_id': user.user_id, 'character': user.character.character_id})
 
 
@@ -106,6 +141,7 @@ def character_first_uncap(character_id: int, user_id=Depends(authed_user_id)):
 
 @router.post('/me/character/{character_id}/exp')
 @server_try
+<<<<<<< HEAD
 async def character_exp(
     character_id: int,
     payload: CharacterExpForm = Depends(CharacterExpForm.as_form),
@@ -113,12 +149,22 @@ async def character_exp(
 ):
     if is_error_response(user_id):
         return user_id
+=======
+async def character_exp(request: Request, character_id: int, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     with Connect() as c:
         user = UserOnline(c, user_id)
         character = UserCharacter(c, character_id)
         character.select_character_info(user)
         core = ItemCore(c)
+<<<<<<< HEAD
         core.amount = -payload.amount
+=======
+        core.amount = - int(form['amount'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         core.item_id = 'core_generic'
         character.upgrade_by_core(user, core)
         return game_success({'user_id': user.user_id, 'character': [character.to_dict()], 'cores': user.cores})
@@ -181,6 +227,7 @@ async def profile_post(request: Request, user_id=Depends(authed_user_id)):
 
 @router.post('/me/setting/{set_arg}')
 @server_try
+<<<<<<< HEAD
 async def sys_set(
     set_arg: str,
     payload: UserSettingForm = Depends(UserSettingForm.as_form),
@@ -190,6 +237,14 @@ async def sys_set(
         return user_id
     with Connect() as c:
         value = payload.value
+=======
+async def sys_set(request: Request, set_arg: str, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    with Connect() as c:
+        value = form['value']
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         user = UserOnline(c, user_id)
         if 'favorite_character' == set_arg:
             user.change_favorite_character(int(value))

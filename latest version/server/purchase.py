@@ -1,6 +1,10 @@
 from time import time
 
+<<<<<<< HEAD
 from fastapi import APIRouter, Depends
+=======
+from fastapi import APIRouter, Depends, Request
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 from core.constant import Constant
 from core.error import InputError, ItemUnavailable
@@ -10,8 +14,12 @@ from core.redeem import UserRedeem
 from core.sql import Connect
 from core.user import UserOnline
 
+<<<<<<< HEAD
 from .native import authed_user_id, game_success, is_error_response, server_try
 from .schemas import PurchaseItemForm, PurchasePackForm, RedeemCodeForm
+=======
+from .native import authed_user_id, form_data, game_success, is_error_response, server_try
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 router = APIRouter(prefix='/purchase', tags=['game-purchase'])
 
@@ -43,6 +51,7 @@ def bundle_bundle():
 
 @router.post('/me/pack')
 @server_try
+<<<<<<< HEAD
 async def buy_pack_or_single(payload: PurchasePackForm = Depends(PurchasePackForm.as_form), user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
@@ -51,6 +60,17 @@ async def buy_pack_or_single(payload: PurchasePackForm = Depends(PurchasePackFor
             purchase_name = payload.pack_id
         elif payload.single_id is not None:
             purchase_name = payload.single_id
+=======
+async def buy_pack_or_single(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    with Connect() as c:
+        if 'pack_id' in form:
+            purchase_name = form['pack_id']
+        elif 'single_id' in form:
+            purchase_name = form['single_id']
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         else:
             return game_success()
 
@@ -67,11 +87,22 @@ async def buy_pack_or_single(payload: PurchasePackForm = Depends(PurchasePackFor
 
 @router.post('/me/item')
 @server_try
+<<<<<<< HEAD
 async def buy_special(payload: PurchaseItemForm = Depends(PurchaseItemForm.as_form), user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
     with Connect() as c:
         item_id = payload.item_id
+=======
+async def buy_special(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    with Connect() as c:
+        if 'item_id' not in form:
+            raise PostError('`item_id` is required')
+        item_id = form['item_id']
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         x = Purchase(c, UserOnline(c, user_id))
         x.purchase_name = item_id
         x.price = 50
@@ -116,10 +147,20 @@ def purchase_stamina(buy_stamina_type: str, user_id=Depends(authed_user_id)):
 
 @router.post('/me/redeem')
 @server_try
+<<<<<<< HEAD
 async def redeem(payload: RedeemCodeForm = Depends(RedeemCodeForm.as_form), user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
     with Connect() as c:
         x = UserRedeem(c, UserOnline(c, user_id))
         x.claim_user_redeem(payload.code)
+=======
+async def redeem(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    form = await form_data(request)
+    with Connect() as c:
+        x = UserRedeem(c, UserOnline(c, user_id))
+        x.claim_user_redeem(form['code'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         return game_success({"coupon": "fragment" + str(x.fragment) if x.fragment > 0 else ""})

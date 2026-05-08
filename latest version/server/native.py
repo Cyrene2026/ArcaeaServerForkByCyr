@@ -6,9 +6,14 @@ from functools import wraps
 from traceback import format_exc
 from typing import Any, Callable
 
+<<<<<<< HEAD
 from fastapi import Depends, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+=======
+from fastapi import Depends, Request
+from fastapi.responses import JSONResponse
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 from core.bundle import BundleParser
 from core.config_manager import Config
@@ -26,6 +31,7 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger('main')
 default_error = ArcError('Unknown Error', status=500)
+<<<<<<< HEAD
 game_bearer = HTTPBearer(auto_error=False)
 game_responses = {
     200: {'model': GameSuccessResponse, 'description': 'Game API success envelope'},
@@ -35,6 +41,8 @@ game_responses = {
     404: {'model': GameErrorResponse, 'description': 'Not found envelope'},
     500: {'model': GameErrorResponse, 'description': 'Server error envelope'},
 }
+=======
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 
 def game_error(e: ArcError = default_error) -> JSONResponse:
@@ -84,10 +92,14 @@ def header_check(request: Request) -> ArcError | None:
     return None
 
 
+<<<<<<< HEAD
 def require_game_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(game_bearer),
 ) -> int | JSONResponse:
+=======
+def require_game_user(request: Request) -> int | JSONResponse:
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     e = header_check(request)
     if e is not None:
         logger.warning(f' - {e.error_code}|{e.api_error_code}: {e}')
@@ -96,10 +108,17 @@ def require_game_user(
     with Connect() as c:
         try:
             user = UserAuth(c)
+<<<<<<< HEAD
             token = credentials.credentials if credentials is not None else request.headers.get('Authorization')
             if not token:
                 raise NoAccess('No token.', -4)
             user.token = token[7:] if token.startswith('Bearer ') else token
+=======
+            token = request.headers.get('Authorization')
+            if not token:
+                raise NoAccess('No token.', -4)
+            user.token = token[7:]
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
             user_id = user.token_get_id()
             request.state.user = user
             return user_id

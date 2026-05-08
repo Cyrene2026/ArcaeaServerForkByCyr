@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class GameSuccessResponse(BaseModel):
+<<<<<<< HEAD
     success: bool = Field(True, description='Whether the game API request succeeded.')
     value: Optional[Any] = Field(None, description='Game API response payload.')
 
@@ -56,6 +57,28 @@ class ApiErrorResponse(BaseModel):
             ],
         },
     }
+=======
+    success: bool = True
+    value: Optional[Any] = None
+
+
+class GameErrorResponse(BaseModel):
+    success: bool = False
+    error_code: int
+    extra: Optional[Any] = None
+
+
+class ApiSuccessResponse(BaseModel):
+    code: int = 0
+    data: dict[str, Any] = Field(default_factory=dict)
+    msg: str = ""
+
+
+class ApiErrorResponse(BaseModel):
+    code: int
+    data: Any = Field(default_factory=dict)
+    msg: str
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 
 def to_jsonable(model: BaseModel) -> dict[str, Any]:

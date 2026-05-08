@@ -4,7 +4,11 @@ from core.config_manager import Config
 
 from . import (auth, course, friend, mission, multiplayer, others, present,
                purchase, score, user, world)
+<<<<<<< HEAD
 from .native import game_error, game_responses, string_to_list
+=======
+from .native import game_error, string_to_list
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 
 def _server_router() -> APIRouter:
@@ -23,7 +27,11 @@ def _server_router() -> APIRouter:
         course.router,
         mission.router,
     ):
+<<<<<<< HEAD
         router.include_router(child, responses=game_responses)
+=======
+        router.include_router(child)
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     return router
 
 

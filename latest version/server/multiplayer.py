@@ -6,8 +6,12 @@ from core.linkplay import MatchStore, Player, RemoteMultiPlayer, Room
 from core.notification import RoomInviteNotification
 from core.sql import Connect
 
+<<<<<<< HEAD
 from .native import authed_user_id, game_success, is_error_response, server_try
 from .schemas import ClientSongMapPayload, MultiplayerUpdatePayload, RoomInviteForm, RoomStatusForm
+=======
+from .native import authed_user_id, form_data, form_get, game_success, is_error_response, server_try
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
 router = APIRouter(prefix='/multiplayer', tags=['game-multiplayer'])
 
@@ -27,6 +31,7 @@ def _ensure_linkplay_available() -> None:
 
 @router.post('/me/room/create')
 @server_try
+<<<<<<< HEAD
 async def room_create(request: Request, payload: ClientSongMapPayload, user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
@@ -35,6 +40,17 @@ async def room_create(request: Request, payload: ClientSongMapPayload, user_id=D
         x = RemoteMultiPlayer()
         user = Player(c, user_id)
         user.get_song_unlock(payload.clientSongMap)
+=======
+async def room_create(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    payload = await request.json()
+    with Connect() as c:
+        x = RemoteMultiPlayer()
+        user = Player(c, user_id)
+        user.get_song_unlock(payload['clientSongMap'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         x.create_room(user)
         r = x.to_dict()
         r.update(_linkplay_endpoint(request))
@@ -43,6 +59,7 @@ async def room_create(request: Request, payload: ClientSongMapPayload, user_id=D
 
 @router.post('/me/room/join/{room_code}')
 @server_try
+<<<<<<< HEAD
 async def room_join(room_code: str, request: Request, payload: ClientSongMapPayload, user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
@@ -51,6 +68,17 @@ async def room_join(room_code: str, request: Request, payload: ClientSongMapPayl
         x = RemoteMultiPlayer()
         user = Player(c, user_id)
         user.get_song_unlock(payload.clientSongMap)
+=======
+async def room_join(room_code: str, request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    payload = await request.json()
+    with Connect() as c:
+        x = RemoteMultiPlayer()
+        user = Player(c, user_id)
+        user.get_song_unlock(payload['clientSongMap'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         room = Room()
         room.room_code = room_code
         x.join_room(room, user)
@@ -61,6 +89,7 @@ async def room_join(room_code: str, request: Request, payload: ClientSongMapPayl
 
 @router.post('/me/update')
 @server_try
+<<<<<<< HEAD
 async def multiplayer_update(request: Request, payload: MultiplayerUpdatePayload, user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
@@ -69,6 +98,17 @@ async def multiplayer_update(request: Request, payload: MultiplayerUpdatePayload
         x = RemoteMultiPlayer()
         user = Player(c, user_id)
         user.token = payload.token
+=======
+async def multiplayer_update(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    payload = await request.json()
+    with Connect() as c:
+        x = RemoteMultiPlayer()
+        user = Player(c, user_id)
+        user.token = int(payload['token'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
         x.update_room(user)
         r = x.to_dict()
         r.update(_linkplay_endpoint(request))
@@ -77,6 +117,7 @@ async def multiplayer_update(request: Request, payload: MultiplayerUpdatePayload
 
 @router.post('/me/room/{room_code}/invite')
 @server_try
+<<<<<<< HEAD
 async def room_invite(
     room_code: str,
     payload: RoomInviteForm = Depends(RoomInviteForm.as_form),
@@ -86,6 +127,14 @@ async def room_invite(
         return user_id
     _ensure_linkplay_available()
     other_user_id = payload.to
+=======
+async def room_invite(room_code: str, request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    form = await form_data(request)
+    other_user_id = form_get(form, 'to', type=int)
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
     x = RemoteMultiPlayer()
     share_token = x.select_room(room_code=room_code)['share_token']
@@ -103,10 +152,20 @@ async def room_invite(
 
 @router.post('/me/room/status')
 @server_try
+<<<<<<< HEAD
 async def room_status(payload: RoomStatusForm = Depends(RoomStatusForm.as_form), user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
     _ensure_linkplay_available()
+=======
+async def room_status(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    form = await form_data(request)
+    share_token = form_get(form, 'shareToken', type=str)
+
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
     x = RemoteMultiPlayer()
     room_code = x.select_room(share_token=payload.shareToken)['room_code']
 
@@ -115,6 +174,7 @@ async def room_status(payload: RoomStatusForm = Depends(RoomStatusForm.as_form),
 
 @router.post('/me/matchmaking/join/')
 @server_try
+<<<<<<< HEAD
 async def matchmaking_join(request: Request, payload: ClientSongMapPayload, user_id=Depends(authed_user_id)):
     if is_error_response(user_id):
         return user_id
@@ -122,6 +182,16 @@ async def matchmaking_join(request: Request, payload: ClientSongMapPayload, user
     with Connect() as c:
         user = Player(None, user_id)
         user.get_song_unlock(payload.clientSongMap)
+=======
+async def matchmaking_join(request: Request, user_id=Depends(authed_user_id)):
+    if is_error_response(user_id):
+        return user_id
+    _ensure_linkplay_available()
+    payload = await request.json()
+    with Connect() as c:
+        user = Player(None, user_id)
+        user.get_song_unlock(payload['clientSongMap'])
+>>>>>>> 954947bebc112b062367f7d2cb788031ac3c0979
 
         x = MatchStore(c)
         x.init_player(user)
